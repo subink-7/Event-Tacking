@@ -1,81 +1,207 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom"; // Import useNavigate for navigation
-import { FormInput } from "./FormInput";
+"use client"
 
-const formFields = [
-  { id: "fullName", label: "Full Name", type: "text" },
-  { id: "email", label: "Email", type: "email" },
-  { id: "password", label: "Password", type: "password" },
-  { id: "confirmPassword", label: "Confirm Password", type: "password" },
-];
+import { useState } from "react"
+import { useNavigate } from "react-router-dom"
+import { motion } from "framer-motion"
+import { FiUser, FiMail, FiLock, FiEye, FiEyeOff, FiUserPlus } from "react-icons/fi"
 
-export function Register() {
-  const [error, setError] = useState(null);
-  const navigate = useNavigate(); // Initialize useNavigate
+export default function Register() {
+  const [fullName, setFullName] = useState("")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [error, setError] = useState("")
+  const [isImageClicked, setIsImageClicked] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const navigate = useNavigate()
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleRegister = async (e) => {
+    e.preventDefault()
 
-    // Get all the form fields
-    setError(null); // Clear error if form is valid
-    alert("Form submitted successfully!");
+    // Basic validation
+    if (!fullName || !email || !password || !confirmPassword) {
+      setError("Please fill in all fields.")
+      return
+    }
 
-    // Add form submission logic here (e.g., send form data to the server)
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.")
+      return
+    }
 
-    // Navigate to the login page after form submission
-    navigate("/login"); // Replace with the actual login page route
-  };
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long.")
+      return
+    }
+
+    setError("")
+
+    try {
+      const response = await fetch("http://localhost:8000/users/api/customuser/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ full_name: fullName, email, password }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        console.log("API Response:", data)
+
+        // Redirect to login page after successful registration
+        navigate("/login")
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error_message || "Registration failed. Please try again.")
+      }
+    } catch (err) {
+      setError("An error occurred. Please try again later.")
+      console.error(err)
+    }
+  }
+
+  const handleTextClick = () => {
+    setIsImageClicked(false)
+  }
 
   return (
-    <div
-      className="flex items-center justify-center py-16 px-5"
-      style={{
-        backgroundColor: "rgba(255, 165, 0, 0.1)", // Optional background for the outer div
-      }}
-    >
-      <form
-        onSubmit={handleSubmit}
-        className="flex flex-col justify-center px-20 py-28 border border-white rounded-lg shadow-lg bg-opacity-80 min-w-[240px] w-[500px] max-md:px-5 max-md:py-24"
-        style={{
-          backgroundImage: "url('/photos/katmandu.jpg')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-          backgroundBlendMode: "overlay",
-        }}
-        aria-labelledby="register-title"
+    <div className="flex h-screen overflow-hidden items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5 }}
+        className="w-11/12 max-w-5xl h-4/5 bg-white flex items-stretch justify-between rounded-3xl shadow-2xl overflow-hidden"
       >
-        <h1
-          id="register-title"
-          className="text-2xl font-bold text-center text-orange-700 bg-opacity-70 rounded p-2"
+        {/* Left side image - enhanced with overlay text */}
+        <motion.div
+          className={`w-1/2 bg-cover bg-center relative cursor-pointer flex items-center justify-center transition-all duration-500 ease-in-out ${isImageClicked ? "scale-105" : ""}`}
+          style={{
+            backgroundImage: "url('/photos/katmandu.jpg')",
+          }}
+          onClick={() => setIsImageClicked(!isImageClicked)}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
         >
-          Register
-        </h1>
-
-        {error && (
-          <div className="mt-4 p-4 bg-red-500 text-white text-center rounded-lg shadow-lg">
-            {error}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent rounded-l-3xl"></div>
+          <div className="z-10 text-white max-w-xs p-6">
+            <h1 className="text-4xl font-extrabold mb-4 tracking-tight leading-tight">Track Your Journey</h1>
+            <p className="text-white/80 font-light tracking-wide">
+              Join our community of explorers and never miss an adventure.
+            </p>
           </div>
-        )}
+        </motion.div>
 
-        <div className="flex flex-col mt-8">
-          {formFields.map((field) => (
-            <FormInput
-              key={field.id}
-              id={field.id}
-              label={field.label}
-              type={field.type}
-            />
-          ))}
-        </div>
-
-        <button
-          type="submit"
-          className="mt-16 px-12 py-3.5 bg-orange-700 rounded-lg text-white max-md:px-5"
+        {/* Right side form - improved typography and spacing */}
+        <motion.div
+          className="w-1/2 flex flex-col justify-center items-center p-12 bg-white"
+          onClick={handleTextClick}
+          initial={{ x: 50, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
         >
-          Register
-        </button>
-      </form>
+          <div className="text-center mb-8">
+            <h2 className="text-4xl font-bold text-gray-800 tracking-tight mt-2">Event Tracking System</h2>
+            <div className="mt-3 flex items-center justify-center gap-2 text-gray-600">
+              <FiUserPlus className="text-[#6CB472]" />
+              <p className="font-medium">Create your account</p>
+            </div>
+          </div>
+
+          <form className="w-full max-w-md space-y-5" onSubmit={handleRegister}>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-red-500 text-center bg-red-50 p-4 rounded-lg border border-red-100 shadow-sm"
+              >
+                <p className="font-medium">{error}</p>
+              </motion.div>
+            )}
+
+            {/* Full Name input - improved styling */}
+            <div className="relative group">
+              <FiUser className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-400 group-focus-within:text-[#6CB472] transition-colors duration-200" />
+              <input
+                type="text"
+                placeholder="Full Name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="w-full px-10 py-3.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6CB472] transition-all duration-300 font-medium placeholder:font-normal"
+              />
+            </div>
+
+            {/* Email input - improved styling */}
+            <div className="relative group">
+              <FiMail className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-400 group-focus-within:text-[#6CB472] transition-colors duration-200" />
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-10 py-3.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6CB472] transition-all duration-300 font-medium placeholder:font-normal"
+              />
+            </div>
+
+            {/* Password input - improved styling */}
+            <div className="relative group">
+              <FiLock className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-400 group-focus-within:text-[#6CB472] transition-colors duration-200" />
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-10 py-3.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6CB472] transition-all duration-300 font-medium placeholder:font-normal"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+              >
+                {showPassword ? <FiEyeOff className="text-[#6CB472]" /> : <FiEye />}
+              </button>
+            </div>
+
+            {/* Confirm Password input - improved styling */}
+            <div className="relative group">
+              <FiLock className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-400 group-focus-within:text-[#6CB472] transition-colors duration-200" />
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                placeholder="Confirm Password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full px-10 py-3.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6CB472] transition-all duration-300 font-medium placeholder:font-normal"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+              >
+                {showConfirmPassword ? <FiEyeOff className="text-[#6CB472]" /> : <FiEye />}
+              </button>
+            </div>
+
+            {/* Submit button - enhanced styling */}
+            <motion.button
+              type="submit"
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className="w-full px-6 py-3.5 mt-2 bg-gradient-to-r from-[#6CB472] to-[#4A8C5F] text-white rounded-lg hover:from-[#5CA362] hover:to-[#3A7C4F] transition-all duration-300 shadow-lg font-semibold tracking-wide"
+            >
+              Create Account
+            </motion.button>
+          </form>
+
+          <p className="mt-8 text-sm text-gray-600 font-medium">
+            Already have an account?{" "}
+            <a href="/login" className="text-[#6CB472] hover:underline font-semibold">
+              Log in here
+            </a>
+          </p>
+        </motion.div>
+      </motion.div>
     </div>
-  );
+  )
 }
+

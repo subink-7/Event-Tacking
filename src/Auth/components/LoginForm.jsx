@@ -1,70 +1,157 @@
+"use client"
 
-import Input from './Input';  // No need to include 'components/' in the path
-import Button from './Button'; // Same as above
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom"; // Import useNavigate for navigation
+import { useState } from "react"
+import { useNavigate } from "react-router-dom"
+import { motion } from "framer-motion"
+import { FiMail, FiLock, FiEye, FiEyeOff } from "react-icons/fi"
 
-export function LoginForm() {
-  const [error, setError] = useState(null);
-  const navigate = useNavigate(); // Initialize useNavigate
+export default function Signup() {
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState("")
+  const [isImageClicked, setIsImageClicked] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const navigate = useNavigate()
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleLogin = async (e) => {
+    e.preventDefault()
 
-    // Get all the form fields
-    setError(null); // Clear error if form is valid
-    alert("Sucessfully Logiin!");
+    if (!email || !password) {
+      setError("Please enter both email and password.")
+      return
+    }
 
-    // Add form submission logic here (e.g., send form data to the server)
+    setError("")
 
-    // Navigate to the login page after form submission
-    navigate("/eventpage"); // Replace with the actual login page route
-  };
+    try {
+      const response = await fetch("http://localhost:8000/users/api/login/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        console.log("API Response:", data) // Log the response to see its structure
+
+        // Now using the correct keys for access_token and refresh_token
+        if (data.access && data.refresh) {
+          localStorage.setItem("accessToken", data.access)
+          localStorage.setItem("refreshToken", data.refresh)
+          navigate("/dashboard")
+        } else {
+          setError("Invalid response structure. No access token found.")
+        }
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error_message || "Login failed. Please try again.")
+      }
+    } catch (err) {
+      setError("An error occurred. Please try again later.")
+      console.error(err)
+    }
+  }
+
+  const handleTextClick = () => {
+    setIsImageClicked(false)
+  }
 
   return (
-    <div
-      className="flex items-center justify-center py-16 px-5"
-      style={{
-        backgroundColor: "rgba(255, 165, 0, 0.1)", // Optional background for the outer div
-      }}
-    >
-      <div
-       onSubmit={handleSubmit}
-        className="flex flex-col justify-center px-20 py-28 border border-white rounded-lg shadow-lg bg-opacity-80 min-w-[240px] w-[500px] max-md:px-5 max-md:py-24"
-        style={{
-          backgroundImage: "url('/photos/katmandu.jpg')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-          backgroundBlendMode: "overlay",
-        }}
+    <div className="flex h-screen overflow-hidden items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5 }}
+        className="w-11/12 max-w-5xl h-4/5 bg-white flex items-stretch justify-between rounded-3xl shadow-2xl overflow-hidden"
       >
-        <form className="flex flex-col w-full" onSubmit={(e) => e.preventDefault()}>
-          <h1 className="text-2xl font-bold text-center text-orange-700 bg-opacity-70 rounded p-2">
-            Login
-          </h1>
-          {error && (
-          <div className="mt-4 p-4 bg-red-500 text-white text-center rounded-lg shadow-lg">
-            {error}
-          </div>
-        )}
-          <div className="flex flex-col mt-8 w-full gap-4">
-            <Input
-              label="Email"
-              type="email"
-              id="email"
-            />
-            <Input
-              label="Password"
-              type="password"
-              id="password"
-            />
-          </div>
-          <div className="flex flex-col mt-16 w-full max-md:mt-10">
-            <Button type="submit">Login</Button>
-          </div>
-        </form>
-      </div>
+        {/* Left side image */}
+        <motion.div
+          className={`w-1/2 bg-cover bg-center relative cursor-pointer flex items-center justify-center transition-all duration-500 ease-in-out ${isImageClicked ? "scale-105" : ""}`}
+          style={{
+            backgroundImage: "url('/photos/katmandu.jpg')",
+          }}
+          onClick={() => setIsImageClicked(!isImageClicked)}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent rounded-l-3xl"></div>
+          <h1 className="text-5xl font-bold text-white z-10 drop-shadow-lg"></h1>
+        </motion.div>
+
+        {/* Right side form */}
+        <motion.div
+          className="w-1/2 flex flex-col justify-center items-center p-12 bg-white"
+          onClick={handleTextClick}
+          initial={{ x: 50, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
+        >
+          <h2 className="text-4xl font-bold mb-2 text-gray-800">Welcome Back</h2>
+          <p className="mb-8 text-gray-600">Log in to your account</p>
+
+          <form className="w-full max-w-md space-y-6" onSubmit={handleLogin}>
+            {error && (
+              <motion.p
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-red-500 text-center bg-red-100 p-3 rounded-lg"
+              >
+                {error}
+              </motion.p>
+            )}
+
+            {/* Email input */}
+            <div className="relative">
+              <FiMail className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6CB472] transition-all duration-300"
+              />
+            </div>
+
+            {/* Password input */}
+            <div className="relative">
+              <FiLock className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6CB472] transition-all duration-300"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showPassword ? <FiEyeOff /> : <FiEye />}
+              </button>
+            </div>
+
+            {/* Submit button */}
+            <motion.button
+              type="submit"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="w-full px-6 py-3 bg-gradient-to-r from-[#6CB472] to-[#4A8C5F] text-white rounded-lg hover:from-[#5CA362] hover:to-[#3A7C4F] transition-all duration-300 shadow-lg"
+            >
+              Log In
+            </motion.button>
+          </form>
+
+          <p className="mt-8 text-sm text-gray-600">
+            Forgot your password?{" "}
+            <a href="#" className="text-[#6CB472] hover:underline">
+              Reset it here
+            </a>
+          </p>
+        </motion.div>
+      </motion.div>
     </div>
-  );
+  )
 }
