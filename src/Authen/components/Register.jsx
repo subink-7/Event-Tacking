@@ -102,7 +102,7 @@ export default function Register() {
           transition={{ delay: 0.2, duration: 0.5 }}
         >
           <div className="text-center mb-8">
-            <h2 className="text-4xl font-bold text-gray-800 tracking-tight mt-2">Event Tracking System</h2>
+            <h2 className="text-3xl font-bold text-gray-800 tracking-tight mt-2">Event Tracking System</h2>
             <div className="mt-3 flex items-center justify-center gap-2 text-gray-600">
               <FiUserPlus className="text-[#6CB472]" />
               <p className="font-medium">Create your account</p>
@@ -193,9 +193,9 @@ export default function Register() {
             </motion.button>
           </form>
 
-          <p className="mt-8 text-sm text-gray-600 font-medium">
+          <p className="mt-8 text-sm text-gray-600 font-medium mb-2">
             Already have an account?{" "}
-            <a href="/login" className="text-[#6CB472] hover:underline font-semibold">
+            <a href="/login" className="text-[#6CB472] hover:underline font-semibold mb-5">
               Log in here
             </a>
           </p>

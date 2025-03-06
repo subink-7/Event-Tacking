@@ -2,7 +2,7 @@ import * as React from "react";
 
 export function Header() {
   return (
-    <div className="flex flex-wrap gap-10 justify-between items-center w-full max-w-[1306px] max-md:max-w-full mt-10">
+    <div className="flex flex-wrap gap-10 justify-between items-center w-full max-w-[1306px] max-md:max-w-full mt-0">
       <img
         loading="lazy"
         src="https://cdn.builder.io/api/v1/image/assets/TEMP/23df5bfe05e34071448b6849aa6a1c93fd6d0ac3f66bc043b442e76d6815eb51?placeholderIfAbsent=true&apiKey=003454df7a3c4f25a3bd7334b00a00cf"

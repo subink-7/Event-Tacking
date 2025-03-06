@@ -8,10 +8,11 @@ import { FiMail, FiLock, FiEye, FiEyeOff } from "react-icons/fi"
 export default function Signup() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [role, setrole] = useState("")
   const [error, setError] = useState("")
   const [isImageClicked, setIsImageClicked] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -29,7 +30,7 @@ export default function Signup() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, role }),
       })
 
       if (response.ok) {
@@ -40,7 +41,17 @@ export default function Signup() {
         if (data.access && data.refresh) {
           localStorage.setItem("accessToken", data.access)
           localStorage.setItem("refreshToken", data.refresh)
-          navigate("/dashboard")
+          localStorage.setItem("role", data.role)
+
+          
+          // Check user role and redirect accordingly
+          
+          if (data.role === "ADMIN") {
+            navigate("/admindashboard")
+            console.log("UserRole",data.role)
+          } else {
+            navigate("/dashboard")
+          }
         } else {
           setError("Invalid response structure. No access token found.")
         }
@@ -149,7 +160,13 @@ export default function Signup() {
             <a href="#" className="text-[#6CB472] hover:underline">
               Reset it here
             </a>
+          
           </p>
+          <div className="mt-5">
+          <a href="#" className="text-[#6CB472] ">
+             <span className="text-red-500 mt-10">Don't have account?</span><span className="hover:underline">Register here</span> 
+            </a>
+          </div>
         </motion.div>
       </motion.div>
     </div>
