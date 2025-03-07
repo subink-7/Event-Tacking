@@ -163,7 +163,7 @@ export default function Signup() {
           
           </p>
           <div className="mt-5">
-          <a href="#" className="text-[#6CB472] ">
+          <a href="/" className="text-[#6CB472] ">
              <span className="text-red-500 mt-10">Don't have account?</span><span className="hover:underline">Register here</span> 
             </a>
           </div>

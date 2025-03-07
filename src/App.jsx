@@ -1,24 +1,19 @@
-import './App.css';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React from "react";
+import { BrowserRouter } from "react-router-dom";
+import Path from "./routes/Path";
 
-import Signup from './Auth/components/LoginForm';
-import EventsPage from './Homepage/components/EventPage';
-import Register from './Authen/components/Register';
-import AdminDashboard from './Admin/AdminDashboard';
+
+
 
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        {/* Public routes */}
-        <Route path="/login" element={<Signup />} />
-        <Route path="/" element={<Register />} />
-        <Route path="/dashboard" element={<EventsPage />} />
-        <Route path="/admindashboard" element={<AdminDashboard />} />
-        
-      </Routes>
-    </Router>
+
+      <BrowserRouter>
+        <Path/>
+      </BrowserRouter>
+      
+  
   );
 }
 
