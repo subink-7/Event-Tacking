@@ -1,7 +1,7 @@
 import * as React from "react";
-import { Search, Menu, LogOut, User, Bell, ChevronDown } from "lucide-react";
+import {  Menu, LogOut, User,  ChevronDown } from "lucide-react";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
-import * as AvatarPrimitive from "@radix-ui/react-avatar";
+
 import { useNavigate } from "react-router-dom"; // Use react-router-dom for navigation
 
 export function Header() {
@@ -14,6 +14,13 @@ export function Header() {
     localStorage.removeItem("refreshToken"); // Remove refresh token
     setIsLoggedIn(false); // Update login state
     navigate("/"); // Navigate to the root route
+  };
+
+  const goToProfile = () => {
+    navigate("/profile"); // Navigate to the profile update page
+  };
+  const goToHome = () => {
+    navigate("/dashboard"); // Navigate to the profile update page
   };
 
   return (
@@ -33,6 +40,10 @@ export function Header() {
         </div>
 
         <nav className="hidden md:flex md:gap-10 jus">
+        <button onClick={goToHome}  className="text-lg font-medium text-foreground/70 hover:text-foreground">
+       
+           Home Page
+          </button>
           <button className="text-lg font-medium text-foreground/70 hover:text-foreground">
             Events
           </button>
@@ -42,13 +53,10 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-4">
-         
-
           {isLoggedIn ? (
             <DropdownMenuPrimitive.Root>
               <DropdownMenuPrimitive.Trigger asChild>
                 <button className="flex items-center gap-2 rounded-md p-1 px-2 hover:bg-accent">
-                
                   <span className="hidden text-sm font-medium md:inline-block">
                     Subin
                   </span>
@@ -61,12 +69,13 @@ export function Header() {
                   className="z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in"
                   sideOffset={4}
                 >
-                  <DropdownMenuPrimitive.Item className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground">
+                  <DropdownMenuPrimitive.Item
+                    onClick={goToProfile} // Navigate to profile update page
+                    className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground"
+                  >
                     <User className="h-4 w-4 mr-2" /> Profile
                   </DropdownMenuPrimitive.Item>
-                  <DropdownMenuPrimitive.Item className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground">
-                    Settings
-                  </DropdownMenuPrimitive.Item>
+                  
                   <DropdownMenuPrimitive.Separator className="-mx-1 my-1 h-px bg-muted" />
                   <DropdownMenuPrimitive.Item
                     onClick={handleLogout}

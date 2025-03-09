@@ -5,6 +5,7 @@ import Signup from "../Auth/components/LoginForm";
 import EventsPage from "../Homepage/components/EventPage";
 import AdminDashboard from "../Admin/AdminDashboard";
 import ProtectedRoute from "./ProtectedRoutes";
+import ProfilePage from "../utils/components/Profile";
 
 
 const Path = () => {
@@ -17,7 +18,8 @@ const Path = () => {
       {/* Protected Route for Dashboard */}
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<EventsPage/>} />
-        <Route path="/dashboard" element={<AdminDashboard />} />
+        <Route path="/admindashboard" element={<AdminDashboard />} />
+     <Route path="/profile" element={<ProfilePage/>}/>
       </Route>
     </Routes>
   );

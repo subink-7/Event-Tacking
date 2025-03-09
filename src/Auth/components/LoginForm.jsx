@@ -9,6 +9,7 @@ export default function Signup() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [role, setrole] = useState("")
+  
   const [error, setError] = useState("")
   const [isImageClicked, setIsImageClicked] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -42,6 +43,7 @@ export default function Signup() {
           localStorage.setItem("accessToken", data.access)
           localStorage.setItem("refreshToken", data.refresh)
           localStorage.setItem("role", data.role)
+          localStorage.setItem("userid", data.id)
 
           
           // Check user role and redirect accordingly
