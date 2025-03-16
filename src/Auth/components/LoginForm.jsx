@@ -44,6 +44,8 @@ export default function Signup() {
           localStorage.setItem("refreshToken", data.refresh)
           localStorage.setItem("role", data.role)
           localStorage.setItem("userid", data.id)
+          localStorage.setItem("name", data.name)
+          localStorage.setItem("email", data.email)
 
           
           // Check user role and redirect accordingly
