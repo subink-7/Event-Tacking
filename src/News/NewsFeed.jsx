@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
+import { CgProfile } from "react-icons/cg";
+import { Header } from "../utils/components/Header";
+import { Footer } from "../utils/components/Footer";
 
 export default function NewsFeed() {
   const [posts, setPosts] = useState([])
@@ -12,195 +15,133 @@ export default function NewsFeed() {
   const [error, setError] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
   const [loadedImages, setLoadedImages] = useState({})
-  
-  // User information states from localStorage
-  const [userData, setUserData] = useState({
-    name: "User",
-    email: "",
-    id: "",
-    role: "",
-    accessToken: ""
-  })
+  const [username, setUsername] = useState("User")
+  const [isReloading, setIsReloading] = useState(false);
 
   // Base URL for API and assets
   const BASE_URL = "http://localhost:8000/"
 
-  // Get user data from localStorage on component mount
-  useEffect(() => {
-    // Retrieve all user data from localStorage
-    const storedName = localStorage.getItem("name") || "User";
-    const storedEmail = localStorage.getItem("email") || "";
-    const storedUserId = localStorage.getItem("userid") || "";
-    const storedRole = localStorage.getItem("role") || "";
-    const storedAccessToken = localStorage.getItem("accessToken") || "";
-    
-    setUserData({
-      name: storedName,
-      email: storedEmail,
-      id: storedUserId,
-      role: storedRole,
-      accessToken: storedAccessToken
-    });
-  }, []);
+  // Credentials for authentication
+  const userEmail = "khadkagokarna234@gmail.com"
+  const userPassword = "subin123"
 
   // Create the Authorization header
   const authHeader = useMemo(() => {
-    // If there's an access token, use Bearer authentication
-    if (userData.accessToken) {
-      return `Bearer ${userData.accessToken}`;
-    }
-    
-    // Fallback to Basic auth if no token is available
-    const userEmail = "khadkagokarna234@gmail.com";
-    const userPassword = "subin123";
     return "Basic " + btoa(userEmail + ":" + userPassword);
-  }, [userData.accessToken]);
+  }, [userEmail, userPassword]);
+
+  // Get user name from localStorage on component mount
+  useEffect(() => {
+    const storedName = localStorage.getItem("name");
+    if (storedName) {
+      setUsername(storedName);
+    }
+  }, []);
 
   // Fetch posts and events on component mount
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch posts with authentication
-        const postsResponse = await fetch(`${BASE_URL}posts/feedback/`, {
-          headers: {
-            Authorization: authHeader,
-          },
-        })
-
-        // Fetch events with authentication
-        const eventsResponse = await fetch(`${BASE_URL}events/`, {
-          headers: {
-            Authorization: authHeader,
-          },
-        })
+        const [postsResponse, eventsResponse] = await Promise.all([
+          fetch(`${BASE_URL}posts/feedback/`, {
+            headers: { Authorization: authHeader },
+          }),
+          fetch(`${BASE_URL}events/`, {
+            headers: { Authorization: authHeader },
+          })
+        ]);
 
         if (!postsResponse.ok || !eventsResponse.ok) {
-          throw new Error("Failed to fetch data")
+          throw new Error("Failed to fetch data");
         }
 
-        const postsData = await postsResponse.json()
-        const eventsData = await eventsResponse.json()
+        const [postsData, eventsData] = await Promise.all([
+          postsResponse.json(),
+          eventsResponse.json()
+        ]);
 
-        setPosts(postsData)
-        setEvents(eventsData)
-        setLoading(false)
+        setPosts(postsData);
+        setEvents(eventsData);
+        setLoading(false);
       } catch (err) {
-        setError("Failed to fetch data. Please try again later.")
-        setLoading(false)
-        console.error("Error fetching data:", err)
+        setError("Failed to fetch data. Please try again later.");
+        setLoading(false);
+        console.error("Error fetching data:", err);
       }
     }
 
-    fetchData()
+    fetchData();
   }, [authHeader]);
 
   // Handle image upload
   const handleImageChange = (e) => {
-    const file = e.target.files[0]
+    const file = e.target.files[0];
     if (file) {
-      setImage(file)
-
-      // Create preview URL
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setImagePreview(reader.result)
-      }
-      reader.readAsDataURL(file)
+      setImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setImagePreview(reader.result);
+      reader.readAsDataURL(file);
     }
   }
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
 
     if (!selectedEvent) {
-      alert("Please select an event")
-      return
+      alert("Please select an event");
+      return;
     }
 
     if (!content.trim()) {
-      alert("Please enter some content")
-      return
+      alert("Please enter some content");
+      return;
     }
 
     try {
-      const formData = new FormData()
-      formData.append("content", content)
-      formData.append("event_id", selectedEvent.id)
-      if (image) {
-        formData.append("image", image)
-      }
+      const formData = new FormData();
+      formData.append("content", content);
+      formData.append("event_id", selectedEvent.id);
+      if (image) formData.append("image", image);
 
       const response = await fetch(`${BASE_URL}posts/feedback/${selectedEvent.id}/`, {
         method: "POST",
-        headers: {
-          Authorization: authHeader,
-        },
+        headers: { Authorization: authHeader },
         body: formData,
-      })
+      });
 
-      if (!response.ok) {
-        throw new Error("Failed to submit feedback")
-      }
+      if (!response.ok) throw new Error("Failed to submit feedback");
 
-      const newPost = await response.json()
-
-      // Add the new post to the top of the posts list
-      setPosts([newPost, ...posts])
-
-      // Reset form
-      setContent("")
-      setImage(null)
-      setImagePreview(null)
-      setSelectedEvent(null)
+      const newPost = await response.json();
+      setPosts([newPost, ...posts]);
+      setContent("");
+      setImage(null);
+      setImagePreview(null);
+      setSelectedEvent(null);
     } catch (err) {
-      console.error("Error submitting feedback:", err)
-      alert("Failed to submit feedback. Please try again.")
+      console.error("Error submitting feedback:", err);
+      alert("Failed to submit feedback. Please try again.");
     }
   }
 
   // Function to get proper image URL
   const getImageUrl = (imageUrl) => {
-    if (!imageUrl) return "/placeholder.svg"
-    // Remove any leading slashes or backslashes from the image path
-    const cleanedUrl = imageUrl.replace(/^[\\/]+/, '')
-    return imageUrl && !imageUrl.startsWith("http") ? `${BASE_URL}${cleanedUrl}` : imageUrl
+    if (!imageUrl) return "/placeholder.svg";
+    const cleanedUrl = imageUrl.replace(/^[\\/]+/, '');
+    return imageUrl && !imageUrl.startsWith("http") ? `${BASE_URL}${cleanedUrl}` : imageUrl;
   }
 
-  // Function to get user display name - this checks both post user data and current user data
-  const getUserDisplayName = (user) => {
-    // If this is the current user's post and we're showing the current user data
-    if (user && userData.id && user.id === userData.id) {
-      return userData.name;
-    }
-    
-    // For other users' posts
+  // Function to get display name
+  const getDisplayName = (user) => {
     if (!user) return "Anonymous User";
-    
-    if (user.username) return user.username;
-    if (user.first_name && user.last_name) return `${user.first_name} ${user.last_name}`;
-    if (user.name) return user.name;
-    if (user.email) return user.email;
-    
-    return "Anonymous User";
+    return user.username || 
+           (user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : null) || 
+           user.first_name || 
+           (user.email ? user.email.split('@')[0] : null) || 
+           " User";
   }
 
-  // Function to get user initial for avatar
-  const getUserInitial = (user) => {
-    // If this is the current user's post and we're showing the current user data
-    if (user && userData.id && user.id === userData.id) {
-      return userData.name.charAt(0).toUpperCase();
-    }
-    
-    // For other users' posts
-    if (!user) return "U";
-    
-    if (user.username) return user.username.charAt(0).toUpperCase();
-    if (user.first_name) return user.first_name.charAt(0).toUpperCase();
-    if (user.name) return user.name.charAt(0).toUpperCase();
-    if (user.email) return user.email.charAt(0).toUpperCase();
-    
-    return "U";
-  }
+  // Function to get user initial
+
 
   if (loading) {
     return (
@@ -216,28 +157,36 @@ export default function NewsFeed() {
         <div className="bg-white p-6 max-w-md rounded-lg shadow-md">
           <div className="text-center text-red-500 font-medium">{error}</div>
           <button
-            className="mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition"
-            onClick={() => window.location.reload()}
-          >
-            Try Again
-          </button>
+  className={`mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition flex items-center justify-center ${isReloading ? 'opacity-75' : ''}`}
+  onClick={() => {
+    setIsReloading(true);
+    window.location.reload();
+  }}
+  disabled={isReloading}
+>
+  {isReloading ? (
+    <>
+      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      Reloading...
+    </>
+  ) : (
+    'Try Again'
+  )}
+</button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-blue-600">facebook</h1>
-          <div className="flex items-center space-x-2">
-            <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
-              <span className="text-white font-medium">{userData.name.charAt(0).toUpperCase()}</span>
-            </div>
+     <div className="min-h-screen bg-[#fcf9f5] font-sans">
+          {/* Header */}
+          <div className="relative z-10 w-full bg-white/80 backdrop-blur-sm shadow-sm">
+            <Header/>
           </div>
-        </div>
-      </header>
 
       <main className="max-w-2xl mx-auto p-4 space-y-4">
         {/* Create Post Card */}
@@ -245,16 +194,16 @@ export default function NewsFeed() {
           <form onSubmit={handleSubmit}>
             <div className="flex items-center space-x-2 mb-4">
               <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
-                <span className="text-white font-medium">{userData.name.charAt(0).toUpperCase()}</span>
+                <span className="text-white font-medium">{username.charAt(0).toUpperCase()}</span>
               </div>
               <div className="flex-1">
                 <select
                   className="w-full p-2 border rounded-full bg-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={selectedEvent ? selectedEvent.id : ""}
                   onChange={(e) => {
-                    const eventId = e.target.value
-                    const event = events.find((event) => event.id.toString() === eventId)
-                    setSelectedEvent(event)
+                    const eventId = e.target.value;
+                    const event = events.find((event) => event.id.toString() === eventId);
+                    setSelectedEvent(event);
                   }}
                 >
                   <option value="">Select an event to post about</option>
@@ -278,7 +227,7 @@ export default function NewsFeed() {
             {imagePreview && (
               <div className="relative mt-3 rounded-lg overflow-hidden">
                 <img
-                  src={imagePreview || "/placeholder.svg"}
+                  src={imagePreview}
                   alt="Preview"
                   className="w-full max-h-96 object-cover rounded-lg"
                 />
@@ -286,8 +235,8 @@ export default function NewsFeed() {
                   type="button"
                   className="absolute top-2 right-2 bg-gray-800 bg-opacity-70 text-white p-1 rounded-full"
                   onClick={() => {
-                    setImage(null)
-                    setImagePreview(null)
+                    setImage(null);
+                    setImagePreview(null);
                   }}
                 >
                   <svg
@@ -363,26 +312,11 @@ export default function NewsFeed() {
               <div key={post.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                 <div className="p-4">
                   <div className="flex items-start space-x-3 mb-3">
-                    {post.user?.profile_picture ? (
-                      <img
-                        src={getImageUrl(post.user.profile_picture)}
-                        alt={getUserDisplayName(post.user)}
-                        className="w-10 h-10 rounded-full object-cover"
-                        onError={(e) => {
-                          e.target.src = "/placeholder.svg"
-                        }}
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
-                        <span className="text-white font-bold">
-                          {getUserInitial(post.user)}
-                        </span>
-                      </div>
-                    )}
+                   <CgProfile className="h-10 w-10 text-blue-600"/>
 
                     <div>
                       <h3 className="font-semibold">
-                        {getUserDisplayName(post.user)}
+                      {username}
                       </h3>
                       <p className="text-gray-500 text-xs">
                         {post.created_at ? new Date(post.created_at).toLocaleString() : "Unknown date"}
@@ -418,41 +352,19 @@ export default function NewsFeed() {
                 )}
 
                 {/* Comment input section */}
-                <div className="p-3 flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">
-                    <span className="text-white font-bold">{userData.name.charAt(0).toUpperCase()}</span>
-                  </div>
-                  <div className="flex-1 relative">
-                    <input
-                      type="text"
-                      placeholder="Write a comment..."
-                      className="w-full py-2 px-3 bg-gray-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <button className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
+               
               </div>
             ))
           ) : (
             <div className="bg-white p-8 text-center rounded-lg shadow-md">
               <div className="text-gray-500">No posts yet. Be the first to share your feedback!</div>
             </div>
+
+            
+
           )}
+
+            
         </div>
       </main>
     </div>

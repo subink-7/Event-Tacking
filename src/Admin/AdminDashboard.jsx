@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
-import { CalendarIcon, Clock, MapPin, FileText, Info } from "lucide-react"
+import { CalendarIcon, Clock, MapPin, FileText, Info, LogOut, Bell } from "lucide-react"
 
 export default function AdminDashboard() {
   const [eventData, setEventData] = useState({
@@ -13,23 +13,63 @@ export default function AdminDashboard() {
     starting_point: "",
     route: "",
     description: "",
-    image: null,  // Added image field here
+    image: null,
+    send_notifications: true, // New field for notification toggle
   })
   
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState({ type: null, message: null })
   const [error, setError] = useState("")
-  const [eventImageUrl, setEventImageUrl] = useState("")  // State to store image URL
+  const [eventImageUrl, setEventImageUrl] = useState("")
+  const [userName, setUserName] = useState("")
   const navigate = useNavigate()
 
+  // Check authentication status on component mount
+  useEffect(() => {
+    const checkAuthStatus = () => {
+      const accessToken = localStorage.getItem("accessToken");
+      const refreshToken = localStorage.getItem("refreshToken");
+      
+      // If no tokens, redirect to login
+      if (!(accessToken || refreshToken)) {
+        navigate("/");
+      }
+      
+      // Set user name
+      const storedUser = localStorage.getItem("name");
+      if (storedUser) {
+        setUserName(storedUser);
+      }
+    };
+    
+    checkAuthStatus();
+    
+    // Add event listener for storage changes
+    window.addEventListener('storage', checkAuthStatus);
+    
+    return () => {
+      window.removeEventListener('storage', checkAuthStatus);
+    };
+  }, [navigate]);
+
+  // Logout function from Header component
+  const handleLogout = () => {
+    console.log("Logging out...");
+    // Clear both tokens on logout
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("name");
+    navigate("/login");
+  };
+
   const handleChange = (e) => {
-    setEventData({ ...eventData, [e.target.name]: e.target.value })
+    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setEventData({ ...eventData, [e.target.name]: value })
     if (submitStatus.message) {
       setSubmitStatus({ type: null, message: null })
     }
   }
 
-  // Handle image change
   const handleImageChange = (e) => {
     const file = e.target.files[0]
     if (file) {
@@ -62,24 +102,72 @@ export default function AdminDashboard() {
     formData.append("starting_point", eventData.starting_point)
     formData.append("route", eventData.route)
     formData.append("description", eventData.description)
-    formData.append("image", eventData.image)  // Append image
+    formData.append("image", eventData.image)
+    formData.append("notifications_sent", eventData.send_notifications)
+    
+  // In handleSubmit function, modify the event creation section:
 
-    try {
-      const response = await fetch("http://localhost:8000/events/", {
-        method: "POST",
-        body: formData,
-      })
+try {
+  // First, create the event
+  const eventResponse = await fetch("http://localhost:8000/events/", {
+    method: "POST",
+    body: formData,
+  })
 
-      if (response.ok) {
-        const data = await response.json()
-        console.log("Event created successfully:", data)
+  if (eventResponse.ok) {
+    const data = await eventResponse.json()
+    console.log("Event created successfully:", data)
+    const eventId = data.id // Make sure we're getting the correct event ID
 
-        // Assuming your backend returns the image URL in the 'image_url' field
-        const imageUrl = data.image_url  // This is an example, adjust as per your backend response
+    // After event is created, call the notification endpoint if notifications are enabled
+    // In handleSubmit function, modify the notification sending section:
+
+// After event is created, call the notification endpoint if notifications are enabled
+
+// In your AdminDashboard.jsx, modify the notification sending part:
+
+if (eventData.send_notifications) {
+  try {
+    console.log("Sending notification to all users for event:", eventId);
+    
+    const notificationResponse = await fetch("http://localhost:8000/events/send-email/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        eventId: eventId,
+        action: "add",
+        sendToAllUsers: true,
+        // Add any required fields for your custom user model
+        email: "all" // or other identifier your backend expects
+      }),
+    });
+
+    if (!notificationResponse.ok) {
+      const errorData = await notificationResponse.json();
+      console.error("Notification error:", errorData);
+      // Optionally show a warning instead of failing the whole operation
+      setSubmitStatus({
+        type: 'warning',
+        message: 'Event created but notifications failed: ' + (errorData.error || "Unknown error"),
+      });
+    }
+  } catch (notificationError) {
+    console.error("Notification failed:", notificationError);
+    // Continue with success message but note notification failure
+    setSubmitStatus({
+      type: 'warning',
+      message: 'Event created but notifications failed to send',
+    });
+  }
+}
+    
+    // Rest of your success handling...
 
         setSubmitStatus({
           type: 'success',
-          message: 'Event created successfully!',
+          message: 'Event created successfully!' + (eventData.send_notifications ? ' Notifications sent to all users.' : ''),
         })
 
         // Clear form
@@ -90,13 +178,13 @@ export default function AdminDashboard() {
           starting_point: "",
           route: "",
           description: "",
-          image: null,  // Reset image
+          image: null,
+          send_notifications: true,
         })
 
-        // Optionally, store the image URL to display it on the page
-        setEventImageUrl(imageUrl)  // Save the image URL in the state
+        setEventImageUrl(eventData.image_url)
       } else {
-        const errorData = await response.json()
+        const errorData = await eventResponse.json()
         setError(errorData.error_message || "Error creating event. Please try again.")
       }
     } catch (err) {
@@ -115,13 +203,28 @@ export default function AdminDashboard() {
       starting_point: "",
       route: "",
       description: "",
-      image: null,  // Reset image
+      image: null,
+      send_notifications: true,
     })
     setSubmitStatus({ type: null, message: null })
   }
 
   return (
     <div className="container mx-auto py-8 px-4">
+      {/* Header with user info and logout button */}
+      <div className="max-w-2xl mx-auto mb-4 flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+        <div className="flex items-center gap-2">
+          {userName && <span className="text-sm font-medium">{userName}</span>}
+          <button 
+            onClick={handleLogout} 
+            className="flex items-center gap-1 rounded-md bg-red-50 hover:bg-red-100 px-3 py-2 text-sm font-medium text-red-600"
+          >
+            <LogOut className="h-4 w-4" /> Logout
+          </button>
+        </div>
+      </div>
+
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -157,7 +260,7 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             {/* Event Details */}
             <div>
-              <label htmlFor="title" className=" text-sm font-medium text-gray-700 flex items-center gap-2 mb-1">
+              <label htmlFor="title" className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-1">
                 <Info className="h-4 w-4" />
                 Event Title
               </label>
@@ -191,7 +294,7 @@ export default function AdminDashboard() {
                 />
               </div>
               <div>
-                <label htmlFor="time" className=" text-sm font-medium text-gray-700 flex items-center gap-2 mb-1">
+                <label htmlFor="time" className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-1">
                   <Clock className="h-4 w-4" />
                   Time
                 </label>
@@ -212,7 +315,7 @@ export default function AdminDashboard() {
 
             {/* Starting Point */}
             <div>
-              <label htmlFor="starting_point" className=" text-sm font-medium text-gray-700 flex items-center gap-2 mb-1">
+              <label htmlFor="starting_point" className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-1">
                 <MapPin className="h-4 w-4" />
                 Starting Point
               </label>
@@ -230,7 +333,7 @@ export default function AdminDashboard() {
 
             {/* Route */}
             <div>
-              <label htmlFor="route" className=" text-sm font-medium text-gray-700 flex items-center gap-2 mb-1">
+              <label htmlFor="route" className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-1">
                 <FileText className="h-4 w-4" />
                 Routes
               </label>
@@ -247,7 +350,7 @@ export default function AdminDashboard() {
 
             {/* Description */}
             <div>
-              <label htmlFor="description" className=" text-sm font-medium text-gray-700 flex items-center gap-2 mb-1">
+              <label htmlFor="description" className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-1">
                 <Info className="h-4 w-4" />
                 Event Description
               </label>
@@ -273,9 +376,25 @@ export default function AdminDashboard() {
                 name="image"
                 type="file"
                 accept="image/*"
-                onChange={handleImageChange}  // Handle image upload
+                onChange={handleImageChange}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+            </div>
+
+            {/* Notification Toggle */}
+            <div className="flex items-center">
+              <input
+                id="send_notifications"
+                name="send_notifications"
+                type="checkbox"
+                checked={eventData.send_notifications}
+                onChange={handleChange}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="send_notifications" className="ml-2 text-sm font-medium text-gray-700 flex items-center gap-2">
+                <Bell className="h-4 w-4 text-gray-500" />
+                Send notification emails to all users
+              </label>
             </div>
 
             {/* Submit Button */}
@@ -293,7 +412,7 @@ export default function AdminDashboard() {
 
         {/* Display the event image */}
         {eventImageUrl && (
-          <div className="mt-4">
+          <div className="mt-4 p-6">
             <h3 className="font-medium text-gray-700">Event Image</h3>
             <img src={eventImageUrl} alt="Event" className="w-full mt-2 rounded-md" />
           </div>

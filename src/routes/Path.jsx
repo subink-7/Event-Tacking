@@ -13,6 +13,8 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import AllEvents from "../utils/components/AllEvents";
 import Eventcard from "../Homepage/components/Eventcard";
+import NewsFeed from "../News/NewsFeed";
+import EventInfo from "../Homepage/EventInfo";
 
 const Path = () => {
   return (
@@ -31,9 +33,13 @@ const Path = () => {
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/notification" element={<Notification />} />
           <Route path="/alleventpage" element={<AllEvents/>}/>
+          <Route path="/newsfeed" element={<NewsFeed/>}/>
           
-          {/* Use /* to enable nested routing within AllEvents */}
-          {/* <Route path="/allevents/*" element={<AllEvents />} /> */}
+          {/* Modified route: Change from static to dynamic with ID parameter */}
+          <Route path="/event/:id" element={<EventInfo/>}/>
+          
+          {/* Keep the old route for backward compatibility if needed */}
+          <Route path="/eventinfo" element={<EventInfo/>}/>
         </Route>
       </Routes>
       <ToastContainer /> {/* Make sure ToastContainer is outside of Routes */}

@@ -57,7 +57,7 @@ export function Header() {
     localStorage.removeItem("name");
     setUserName(""); 
     setIsLoggedIn(false);
-    navigate("/");
+    navigate("/login");
   };
 
   // Optional: You could implement a function to refresh the access token
@@ -87,6 +87,7 @@ export function Header() {
   const goToProfile = () => navigate("/profile");
   const goToHome = () => navigate("/dashboard");
   const goToEvent = () => navigate("/tracking");
+  const goToNewsFeed = () => navigate("/newsfeed");
   const goToNotification = () => navigate("/notification");
   const goToEventCard = () => navigate("/alleventpage");
 
@@ -120,6 +121,10 @@ export function Header() {
           <button onClick={goToEvent}
            className="text-lg font-medium text-foreground/70 hover:text-foreground">
             Calendar
+          </button>
+          <button onClick={goToNewsFeed}
+           className="text-lg font-medium text-foreground/70 hover:text-foreground">
+             Event Feed
           </button>
          
         </nav>

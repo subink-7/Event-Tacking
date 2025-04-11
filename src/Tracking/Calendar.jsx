@@ -11,6 +11,9 @@ import {
   isSameMonth,
   isSameDay,
   isToday,
+  startOfWeek,
+  addDays,
+  getDay
 } from "date-fns"
 import { useSelector, useDispatch } from "react-redux"
 import { addNotification, removeNotification, selectNotifications } from "../services/notificationSlice"
@@ -101,9 +104,17 @@ const CalendarPage = () => {
   const handleNextMonth = () => setCurrentDate(addMonths(currentDate, 1))
   const handleBackToTracking = () => navigate("/tracking")
 
+  // Get the first day of the month
   const monthStart = startOfMonth(currentDate)
+  // Get the last day of the month
   const monthEnd = endOfMonth(currentDate)
-  const dateRange = eachDayOfInterval({ start: monthStart, end: monthEnd })
+  // Get the first day of the first week of the month
+  const startDate = startOfWeek(monthStart)
+  // Generate calendar days including days from previous and next months to fill weeks
+  const dateRange = eachDayOfInterval({ 
+    start: startDate, 
+    end: addDays(endOfMonth(currentDate), 6 - getDay(monthEnd)) 
+  })
 
   const normalizeEvents = () =>
     events.map((event) => ({
@@ -479,4 +490,3 @@ const CalendarPage = () => {
 }
 
 export default CalendarPage
-
