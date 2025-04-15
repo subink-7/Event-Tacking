@@ -15,6 +15,7 @@ import AllEvents from "../utils/components/AllEvents";
 import Eventcard from "../Homepage/components/Eventcard";
 import NewsFeed from "../News/NewsFeed";
 import EventInfo from "../Homepage/EventInfo";
+import SuperadminDashbaord from "../Superadmin/SuperadminDashbaord";
 
 const Path = () => {
   return (
@@ -34,6 +35,7 @@ const Path = () => {
           <Route path="/notification" element={<Notification />} />
           <Route path="/alleventpage" element={<AllEvents/>}/>
           <Route path="/newsfeed" element={<NewsFeed/>}/>
+          <Route path="/superadmin" element={<SuperadminDashbaord/>}/>
           
           {/* Modified route: Change from static to dynamic with ID parameter */}
           <Route path="/event/:id" element={<EventInfo/>}/>

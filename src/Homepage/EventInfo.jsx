@@ -6,6 +6,8 @@ import { Header } from "../utils/components/Header"
 import { useParams, useLocation, Link } from "react-router-dom"
 import { Calendar, MapPin, Clock, ArrowLeft, Users, Heart, Share2 } from "lucide-react"
 import { Footer } from "../utils/components/Footer"
+import { MapComponent } from "./components/MapComponent"
+
 
 export default function EventInfo() {
   const [event, setEvent] = useState(null)
@@ -13,16 +15,19 @@ export default function EventInfo() {
   const { id } = useParams()
   const location = useLocation()
   const eventData = location.state?.eventData
-  // inside component
-const navigate = useNavigate()
+  const navigate = useNavigate()
 
-// then use it like:
-const goto = () => navigate("/calendar")
+  // State for map markers
+  const [mapMarkers, setMapMarkers] = useState([])
+  const [mapCenter, setMapCenter] = useState([27.7172, 85.3240]) // Default to Kathmandu
+
+  const goto = () => navigate("/calendar")
 
   useEffect(() => {
     // If eventData was passed via location state, use it directly
     if (eventData) {
       setEvent(eventData)
+      processEventData(eventData)
       setLoading(false)
       return
     }
@@ -38,6 +43,7 @@ const goto = () => navigate("/calendar")
         })
         .then((data) => {
           setEvent(data)
+          processEventData(data)
           setLoading(false)
         })
         .catch((error) => {
@@ -47,14 +53,135 @@ const goto = () => navigate("/calendar")
     }
   }, [id, eventData])
 
+  // Process event data for map markers
+// Process event data for map markers
+const processEventData = (eventData) => {
+  if (eventData) {
+    console.log("Processing event data:", eventData);
+    
+    // Set the map center
+    if (eventData.latitude && eventData.longitude) {
+      setMapCenter([parseFloat(eventData.latitude), parseFloat(eventData.longitude)]);
+      
+      // Process route data
+      if (eventData.route) {
+        try {
+          // First, remove the outer quotes if they exist
+          let routeString = eventData.route;
+          if (routeString.startsWith('"') && routeString.endsWith('"')) {
+            routeString = routeString.slice(1, -1);
+          }
+          
+          // Then unescape the inner quotes
+          routeString = routeString.replace(/\\"/g, '"');
+          
+          console.log("Cleaned route string:", routeString);
+          const routeData = JSON.parse(routeString);
+          console.log("Parsed route data:", routeData);
+          
+          if (Array.isArray(routeData)) {
+            const markers = routeData.map((point, index) => {
+              return {
+                position: [parseFloat(point.lat), parseFloat(point.lng)],
+                title: point.name,
+                description: index === 0 ? "Starting Point" : 
+                          index === routeData.length - 1 ? "Final Destination" : 
+                          "Checkpoint",
+                index: index + 1
+              };
+            });
+            
+            console.log("Created markers:", markers);
+            setMapMarkers(markers);
+          }
+        } catch (error) {
+          console.error("Error parsing route data:", error);
+          
+          // Fallback to regex approach if JSON parsing fails
+          try {
+            const routeStr = eventData.route;
+            const regex = /"name":"([^"]+)"[^"]*"lat":([^,]+)[^"]*"lng":([^}]+)/g;
+            const markers = [];
+            let match;
+            let index = 1;
+            
+            while ((match = regex.exec(routeStr)) !== null) {
+              const [_, name, lat, lng] = match;
+              markers.push({
+                position: [parseFloat(lat), parseFloat(lng)],
+                title: name,
+                description: index === 1 ? "Starting Point" : "Checkpoint",
+                index: index
+              });
+              index++;
+            }
+            
+            // Update the last point's description if we have multiple points
+            if (markers.length > 1) {
+              markers[markers.length - 1].description = "Final Destination";
+            }
+            
+            console.log("Created markers with regex fallback:", markers);
+            setMapMarkers(markers);
+          } catch (regexError) {
+            console.error("Regex fallback also failed:", regexError);
+          }
+        }
+      }
+    }
+  }
+};
   // Parse route string into an array if it's a string
-  const routeArray = event?.route
-    ? Array.isArray(event.route)
-      ? event.route
-      : event.route.split(",").map((item) => item.trim())
-    : []
+// Parse route data
+const getRouteArray = () => {
+  if (!event?.route) return [];
+  
+  try {
+    // First clean the route string
+    let routeString = event.route;
+    if (typeof routeString === 'string') {
+      if (routeString.startsWith('"') && routeString.endsWith('"')) {
+        routeString = routeString.slice(1, -1);
+      }
+      routeString = routeString.replace(/\\"/g, '"');
+      
+      const routeData = JSON.parse(routeString);
+      return Array.isArray(routeData) ? routeData.map(point => point.name) : [];
+    }
+    return [];
+  } catch (error) {
+    console.error("Error parsing route names:", error);
+    
+    // Regex fallback for route names
+    try {
+      const routeStr = event.route;
+      const regex = /"name":"([^"]+)"/g;
+      const names = [];
+      let match;
+      
+      while ((match = regex.exec(routeStr)) !== null) {
+        names.push(match[1]);
+      }
+      
+      return names;
+    } catch (regexError) {
+      console.error("Regex fallback for names failed:", regexError);
+      return [];
+    }
+  }
+};
+
+const routeArray = getRouteArray()
 
   // Format image URL
+
+  
+
+  // Create polyline points for the route
+  const polylinePoints = mapMarkers.map(marker => marker.position)
+  console.log (polylinePoints)
+  console.log (routeArray)
+
   const imageUrl =
     event?.image && !event.image.startsWith("http")
       ? `http://127.0.0.1:8000/${event.image}`
@@ -152,7 +279,6 @@ const goto = () => navigate("/calendar")
                 <MapPin className="h-5 w-5 mr-2 text-rose-500 flex-shrink-0" />
                 <span className="text-lg">{event.starting_point}</span>
               </p>
-
             </div>
 
             <div className="p-5 bg-gradient-to-r from-rose-50 to-amber-50 rounded-xl mb-6 border border-rose-100">
@@ -198,6 +324,29 @@ const goto = () => navigate("/calendar")
             Description
           </h2>
           <p className="text-gray-700 leading-relaxed text-lg">{event.description}</p>
+        </div>
+      </div>
+
+      {/* Map Section */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+          <h2 className="text-2xl font-bold mb-6 text-gray-800 inline-block pb-2 border-b-2 border-rose-300">
+            Event Map
+          </h2>
+          
+          {/* Map Component */}
+          <div className="rounded-xl overflow-hidden shadow-lg">
+            <MapComponent
+              center={mapCenter}
+              markers={mapMarkers}
+              polylinePoints={polylinePoints}
+              height="384px"
+            />
+          </div>
+          
+          <div className="mt-6 bg-gray-50 p-4 rounded-lg text-sm text-gray-600">
+            <p>The map shows the event route from {routeArray[0]} to {routeArray[routeArray.length - 1]}. Click on markers to see details.</p>
+          </div>
         </div>
       </div>
 
@@ -252,17 +401,16 @@ const goto = () => navigate("/calendar")
           <div className="mt-12 bg-gradient-to-r from-rose-100 to-amber-100 rounded-xl p-6 text-center">
             <h3 className="text-xl font-bold text-gray-800 mb-3">Secure your spot now and be part of this amazing experience by tracking your Event!</h3>
             <button onClick={goto} className="px-8 py-4 bg-gradient-to-r from-rose-500 to-amber-500 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
-              Track you Event 
+              Track your Event 
             </button>
           </div>
         </div>
       </div>
 
       {/* Footer */}
-     <div className="relative z-10 mt-auto">
-            <Footer/>
-          </div>
+      <div className="relative z-10 mt-auto">
+        <Footer/>
+      </div>
     </div>
   )
 }
-

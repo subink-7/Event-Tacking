@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
-import { CalendarIcon, Clock, MapPin, FileText, Info, LogOut, Bell } from "lucide-react"
+import { CalendarIcon, Clock, MapPin, FileText, Info, LogOut, Bell, MapPinOff, Globe } from "lucide-react"
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
+import { Header } from "../utils/components/Header"
 
 export default function AdminDashboard() {
   const [eventData, setEventData] = useState({
@@ -14,14 +16,28 @@ export default function AdminDashboard() {
     route: "",
     description: "",
     image: null,
-    send_notifications: true, // New field for notification toggle
+    send_notifications: true,
+    latitude: null,
+    longitude: null,
+    locationVerified: false,
   })
+  
+  // Add state for route points
+  const [routePoints, setRoutePoints] = useState([
+    { name: "", lat: null, lng: null }
+  ])
   
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState({ type: null, message: null })
   const [error, setError] = useState("")
   const [eventImageUrl, setEventImageUrl] = useState("")
   const [userName, setUserName] = useState("")
+  const [showMap, setShowMap] = useState(false)
+  const [mapCenter, setMapCenter] = useState([27.7172, 85.3240]) // Default Kathmandu
+  const [isGeocodingStarting, setIsGeocodingStarting] = useState(false)
+  const [geocodingError, setGeocodingError] = useState("")
+  const [activePointIndex, setActivePointIndex] = useState(null)
+  
   const navigate = useNavigate()
 
   // Check authentication status on component mount
@@ -52,6 +68,86 @@ export default function AdminDashboard() {
     };
   }, [navigate]);
 
+  // Set the first route point to match the starting point
+  useEffect(() => {
+    if (eventData.starting_point && routePoints.length > 0) {
+      const updatedPoints = [...routePoints];
+      updatedPoints[0].name = eventData.starting_point;
+      
+      // If starting point has coordinates, add them to the first route point
+      if (eventData.latitude !== null && eventData.longitude !== null) {
+        updatedPoints[0].lat = eventData.latitude;
+        updatedPoints[0].lng = eventData.longitude;
+      }
+      
+      setRoutePoints(updatedPoints);
+    }
+  }, [eventData.starting_point, eventData.latitude, eventData.longitude]);
+
+  // Geocode function to convert address to coordinates using OpenStreetMap's Nominatim
+  const geocodeLocation = async (locationName, pointIndex = null) => {
+    setIsGeocodingStarting(true);
+    setGeocodingError("");
+    
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationName)}&limit=1`);
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        const { lat, lon } = data[0];
+        const parsedLat = parseFloat(lat);
+        const parsedLon = parseFloat(lon);
+        
+        if (pointIndex !== null) {
+          // Updating a route point
+          const updatedPoints = [...routePoints];
+          updatedPoints[pointIndex].lat = parsedLat;
+          updatedPoints[pointIndex].lng = parsedLon;
+          setRoutePoints(updatedPoints);
+          
+          // If it's the first point, also update the event starting point
+          if (pointIndex === 0) {
+            setEventData(prev => ({
+              ...prev,
+              latitude: parsedLat,
+              longitude: parsedLon,
+              locationVerified: true
+            }));
+          }
+        } else {
+          // Updating the starting point
+          setEventData(prev => ({
+            ...prev, 
+            latitude: parsedLat, 
+            longitude: parsedLon,
+            locationVerified: true
+          }));
+          
+          // Also update the first route point
+          if (routePoints.length > 0) {
+            const updatedPoints = [...routePoints];
+            updatedPoints[0].lat = parsedLat;
+            updatedPoints[0].lng = parsedLon;
+            setRoutePoints(updatedPoints);
+          }
+        }
+        
+        setMapCenter([parsedLat, parsedLon]);
+        setShowMap(true);
+        return { lat: parsedLat, lon: parsedLon };
+      } else {
+        setGeocodingError("Location not found. Please enter a valid location or set coordinates manually.");
+        return null;
+      }
+    } catch (error) {
+      console.error("Geocoding error:", error);
+      setGeocodingError("Error while geocoding. Please try again or set coordinates manually.");
+      return null;
+    } finally {
+      setIsGeocodingStarting(false);
+    }
+  };
+
   // Logout function from Header component
   const handleLogout = () => {
     console.log("Logging out...");
@@ -65,10 +161,151 @@ export default function AdminDashboard() {
   const handleChange = (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     setEventData({ ...eventData, [e.target.name]: value })
+    
+    // Reset location verification if starting point changes
+    if (e.target.name === 'starting_point') {
+      setEventData(prev => ({
+        ...prev,
+        [e.target.name]: value,
+        locationVerified: false
+      }));
+    }
+    
     if (submitStatus.message) {
       setSubmitStatus({ type: null, message: null })
     }
-  }
+  };
+
+  const handleCoordinateChange = (e) => {
+    const { name, value } = e.target;
+    const parsedValue = parseFloat(value);
+    
+    if (!isNaN(parsedValue)) {
+      setEventData(prev => ({
+        ...prev,
+        [name]: parsedValue
+      }));
+      
+      // If updating starting point coordinates, also update the first route point
+      if ((name === 'latitude' || name === 'longitude') && routePoints.length > 0) {
+        const updatedPoints = [...routePoints];
+        if (name === 'latitude') {
+          updatedPoints[0].lat = parsedValue;
+        } else if (name === 'longitude') {
+          updatedPoints[0].lng = parsedValue;
+        }
+        setRoutePoints(updatedPoints);
+      }
+    }
+  };
+
+  // Handle route point name change
+  const handleRoutePointNameChange = (index, value) => {
+    const updatedPoints = [...routePoints];
+    updatedPoints[index].name = value;
+    setRoutePoints(updatedPoints);
+  };
+
+  // Handle route point coordinate change
+  const handleRoutePointCoordinateChange = (index, field, value) => {
+    const parsedValue = parseFloat(value);
+    if (!isNaN(parsedValue)) {
+      const updatedPoints = [...routePoints];
+      updatedPoints[index][field] = parsedValue;
+      setRoutePoints(updatedPoints);
+      
+      // If updating the first point coordinates, also update the event starting point
+      if (index === 0) {
+        if (field === 'lat') {
+          setEventData(prev => ({ ...prev, latitude: parsedValue }));
+        } else if (field === 'lng') {
+          setEventData(prev => ({ ...prev, longitude: parsedValue }));
+        }
+      }
+    }
+  };
+
+  // Add a new route point
+  const addRoutePoint = () => {
+    setRoutePoints([...routePoints, { name: "", lat: null, lng: null }]);
+  };
+
+  // Remove a route point
+  const removeRoutePoint = (index) => {
+    if (routePoints.length > 1) {
+      const updatedPoints = [...routePoints];
+      updatedPoints.splice(index, 1);
+      setRoutePoints(updatedPoints);
+    }
+  };
+
+  // Verify route point location
+  const verifyRoutePointLocation = async (index) => {
+    const pointName = routePoints[index].name;
+    if (!pointName) {
+      setGeocodingError("Please enter a location name first.");
+      return;
+    }
+    
+    setActivePointIndex(index);
+    await geocodeLocation(pointName, index);
+  };
+
+  const handleMapClick = (e) => {
+    const { lat, lng } = e.latlng;
+    
+    if (activePointIndex !== null) {
+      // Update the active route point
+      const updatedPoints = [...routePoints];
+      updatedPoints[activePointIndex].lat = lat;
+      updatedPoints[activePointIndex].lng = lng;
+      setRoutePoints(updatedPoints);
+      
+      // If updating the first point, also update the event starting point
+      if (activePointIndex === 0) {
+        setEventData(prev => ({
+          ...prev,
+          latitude: lat,
+          longitude: lng,
+          locationVerified: true
+        }));
+      }
+    } else {
+      // Default - update the starting point
+      setEventData(prev => ({
+        ...prev,
+        latitude: lat,
+        longitude: lng,
+        locationVerified: true
+      }));
+      
+      // Also update the first route point
+      if (routePoints.length > 0) {
+        const updatedPoints = [...routePoints];
+        updatedPoints[0].lat = lat;
+        updatedPoints[0].lng = lng;
+        setRoutePoints(updatedPoints);
+      }
+    }
+  };
+
+  // Map click handler component
+  const MapClickHandler = () => {
+    useMapEvents({
+      click: handleMapClick
+    });
+    return null;
+  };
+
+  const handleVerifyLocation = async () => {
+    if (!eventData.starting_point) {
+      setGeocodingError("Please enter a starting point first.");
+      return;
+    }
+    
+    setActivePointIndex(null); // Set to null to indicate we're verifying the starting point
+    await geocodeLocation(eventData.starting_point);
+  };
 
   const handleImageChange = (e) => {
     const file = e.target.files[0]
@@ -81,13 +318,31 @@ export default function AdminDashboard() {
     e.preventDefault()
 
     // Basic validation
-    if (!eventData.title || !eventData.date || !eventData.time || !eventData.starting_point || !eventData.route || !eventData.description) {
-      setError("Please fill in all fields.")
+    if (!eventData.title || !eventData.date || !eventData.time || !eventData.starting_point || !eventData.description) {
+      setError("Please fill in all required fields.")
       return
     }
 
     if (!eventData.image) {
       setError("Please upload an event image.")
+      return
+    }
+    
+    // Validate coordinates
+    if (!eventData.latitude || !eventData.longitude) {
+      setError("Please verify location to set coordinates for mapping.")
+      return
+    }
+    
+    // Validate route points
+    if (routePoints.length < 2) {
+      setError("Please add at least two route points (starting and ending points).")
+      return
+    }
+    
+    // Check if all route points have names
+    if (routePoints.some(point => !point.name.trim())) {
+      setError("All route points must have names.")
       return
     }
 
@@ -100,71 +355,62 @@ export default function AdminDashboard() {
     formData.append("date", eventData.date)
     formData.append("time", eventData.time)
     formData.append("starting_point", eventData.starting_point)
-    formData.append("route", eventData.route)
     formData.append("description", eventData.description)
     formData.append("image", eventData.image)
     formData.append("notifications_sent", eventData.send_notifications)
+    formData.append("latitude", eventData.latitude)
+    formData.append("longitude", eventData.longitude)
     
-  // In handleSubmit function, modify the event creation section:
-
-try {
-  // First, create the event
-  const eventResponse = await fetch("http://localhost:8000/events/", {
-    method: "POST",
-    body: formData,
-  })
-
-  if (eventResponse.ok) {
-    const data = await eventResponse.json()
-    console.log("Event created successfully:", data)
-    const eventId = data.id // Make sure we're getting the correct event ID
-
-    // After event is created, call the notification endpoint if notifications are enabled
-    // In handleSubmit function, modify the notification sending section:
-
-// After event is created, call the notification endpoint if notifications are enabled
-
-// In your AdminDashboard.jsx, modify the notification sending part:
-
-if (eventData.send_notifications) {
-  try {
-    console.log("Sending notification to all users for event:", eventId);
+    // Add route points as JSON string
+    formData.append("route", JSON.stringify(routePoints))
     
-    const notificationResponse = await fetch("http://localhost:8000/events/send-email/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        eventId: eventId,
-        action: "add",
-        sendToAllUsers: true,
-        // Add any required fields for your custom user model
-        email: "all" // or other identifier your backend expects
-      }),
-    });
+    try {
+      // First, create the event
+      const eventResponse = await fetch("http://localhost:8000/events/", {
+        method: "POST",
+        body: formData,
+      })
 
-    if (!notificationResponse.ok) {
-      const errorData = await notificationResponse.json();
-      console.error("Notification error:", errorData);
-      // Optionally show a warning instead of failing the whole operation
-      setSubmitStatus({
-        type: 'warning',
-        message: 'Event created but notifications failed: ' + (errorData.error || "Unknown error"),
-      });
-    }
-  } catch (notificationError) {
-    console.error("Notification failed:", notificationError);
-    // Continue with success message but note notification failure
-    setSubmitStatus({
-      type: 'warning',
-      message: 'Event created but notifications failed to send',
-    });
-  }
-}
+      if (eventResponse.ok) {
+        const data = await eventResponse.json()
+        console.log("Event created successfully:", data)
+        const eventId = data.id // Make sure we're getting the correct event ID
+
+        // After event is created, call the notification endpoint if notifications are enabled
+        if (eventData.send_notifications) {
+          try {
+            console.log("Sending notification to all users for event:", eventId);
+            
+            const notificationResponse = await fetch("http://localhost:8000/events/send-email/", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                eventId: eventId,
+                action: "add",
+                sendToAllUsers: true,
+                email: "all"
+              }),
+            });
+
+            if (!notificationResponse.ok) {
+              const errorData = await notificationResponse.json();
+              console.error("Notification error:", errorData);
+              setSubmitStatus({
+                type: 'warning',
+                message: 'Event created but notifications failed: ' + (errorData.error || "Unknown error"),
+              });
+            }
+          } catch (notificationError) {
+            console.error("Notification failed:", notificationError);
+            setSubmitStatus({
+              type: 'warning',
+              message: 'Event created but notifications failed to send',
+            });
+          }
+        }
     
-    // Rest of your success handling...
-
         setSubmitStatus({
           type: 'success',
           message: 'Event created successfully!' + (eventData.send_notifications ? ' Notifications sent to all users.' : ''),
@@ -180,9 +426,16 @@ if (eventData.send_notifications) {
           description: "",
           image: null,
           send_notifications: true,
+          latitude: null,
+          longitude: null,
+          locationVerified: false,
         })
+        
+        // Reset route points
+        setRoutePoints([{ name: "", lat: null, lng: null }]);
 
-        setEventImageUrl(eventData.image_url)
+        setEventImageUrl(data.image_url)
+        setShowMap(false)
       } else {
         const errorData = await eventResponse.json()
         setError(errorData.error_message || "Error creating event. Please try again.")
@@ -205,31 +458,27 @@ if (eventData.send_notifications) {
       description: "",
       image: null,
       send_notifications: true,
+      latitude: null,
+      longitude: null,
+      locationVerified: false,
     })
+    setRoutePoints([{ name: "", lat: null, lng: null }]);
     setSubmitStatus({ type: null, message: null })
+    setShowMap(false)
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      {/* Header with user info and logout button */}
-      <div className="max-w-2xl mx-auto mb-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-        <div className="flex items-center gap-2">
-          {userName && <span className="text-sm font-medium">{userName}</span>}
-          <button 
-            onClick={handleLogout} 
-            className="flex items-center gap-1 rounded-md bg-red-50 hover:bg-red-100 px-3 py-2 text-sm font-medium text-red-600"
-          >
-            <LogOut className="h-4 w-4" /> Logout
-          </button>
-        </div>
+    <div className="min-h-screen bg-gradient-to-b from-rose-50 to-white font-sans">
+            <div className="sticky top-0 z-50 w-full bg-white/90 backdrop-blur-sm shadow-sm">
+              <Header/>
+        
       </div>
 
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5 }}
-        className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden"
+        className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden"
       >
         <div className="p-6 bg-slate-50 border-b">
           <h2 className="text-2xl font-bold">Create New Event</h2>
@@ -313,39 +562,214 @@ if (eventData.send_notifications) {
             {/* Divider */}
             <hr className="my-4" />
 
-            {/* Starting Point */}
+            {/* Starting Point with Location Verification */}
             <div>
               <label htmlFor="starting_point" className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-1">
                 <MapPin className="h-4 w-4" />
                 Starting Point
               </label>
-              <input
-                id="starting_point"
-                name="starting_point"
-                type="text"
-                placeholder="Enter the starting location"
-                value={eventData.starting_point}
-                onChange={handleChange}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
+              <div className="flex gap-2">
+                <input
+                  id="starting_point"
+                  name="starting_point"
+                  type="text"
+                  placeholder="Enter the starting location"
+                  value={eventData.starting_point}
+                  onChange={handleChange}
+                  className="flex-1 rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={handleVerifyLocation}
+                  disabled={isGeocodingStarting || !eventData.starting_point}
+                  className="bg-blue-500 text-white px-3 py-2 rounded-md hover:bg-blue-600 disabled:opacity-50 flex items-center gap-1"
+                >
+                  {isGeocodingStarting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Verifying...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Globe className="h-4 w-4" />
+                      <span>Verify Location</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              {geocodingError && (
+                <p className="mt-1 text-sm text-red-500">{geocodingError}</p>
+              )}
+              {eventData.locationVerified && (
+                <p className="mt-1 text-sm text-green-600 flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  Location verified! Coordinates set for mapping.
+                </p>
+              )}
             </div>
 
-            {/* Route */}
+            {/* Coordinates (optional manual input) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="latitude" className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-1">
+                  <MapPin className="h-4 w-4" />
+                  Latitude
+                </label>
+                <input
+                  id="latitude"
+                  name="latitude"
+                  type="number"
+                  step="0.0000001"
+                  placeholder="e.g. 27.7172"
+                  value={eventData.latitude || ''}
+                  onChange={handleCoordinateChange}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label htmlFor="longitude" className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-1">
+                  <MapPin className="h-4 w-4" />
+                  Longitude
+                </label>
+                <input
+                  id="longitude"
+                  name="longitude"
+                  type="number"
+                  step="0.0000001"
+                  placeholder="e.g. 85.3240"
+                  value={eventData.longitude || ''}
+                  onChange={handleCoordinateChange}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Map Preview */}
+            {showMap && (
+              <div className="mt-4">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2">
+                  <Globe className="h-4 w-4" />
+                  Location Preview (Click to adjust pin location)
+                </label>
+                <div className="h-72 rounded-lg overflow-hidden border border-gray-300">
+                  <MapContainer 
+                    center={mapCenter} 
+                    zoom={15} 
+                    style={{ height: '100%', width: '100%' }}
+                  >
+                    <TileLayer
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    />
+                    {routePoints.map((point, idx) => (
+                      point.lat && point.lng && (
+                        <Marker 
+                          key={idx} 
+                          position={[point.lat, point.lng]}
+                        />
+                      )
+                    ))}
+                    <MapClickHandler />
+                  </MapContainer>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Click on the map to refine the active point location if needed.
+                </p>
+              </div>
+            )}
+
+            {/* Route Points */}
             <div>
-              <label htmlFor="route" className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-1">
+              <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2">
                 <FileText className="h-4 w-4" />
-                Routes
+                Route Points
               </label>
-              <textarea
-                id="route"
-                name="route"
-                placeholder="Describe the routes or checkpoints"
-                value={eventData.route}
-                onChange={handleChange}
-                className="w-full min-h-[100px] rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
+              <div className="space-y-3">
+                {routePoints.map((point, index) => (
+                  <div key={index} className="flex flex-col border p-3 rounded-md bg-gray-50">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-sm">Point {index + 1} {index === 0 ? '(Starting Point)' : ''}</span>
+                      {index > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => removeRoutePoint(index)}
+                          className="text-red-500 hover:text-red-700 text-sm"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    
+                    <div className="mb-2">
+                      <label className="text-xs text-gray-600 mb-1 block">Location Name</label>
+                      <input
+                        type="text"
+                        value={point.name}
+                        onChange={(e) => handleRoutePointNameChange(index, e.target.value)}
+                        placeholder="Enter location name"
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        disabled={index === 0} // Disable if it's the starting point
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
+                      <div>
+                        <label className="text-xs text-gray-600 mb-1 block">Latitude</label>
+                        <input
+                          type="number"
+                          step="0.0000001"
+                          value={point.lat || ''}
+                          onChange={(e) => handleRoutePointCoordinateChange(index, 'lat', e.target.value)}
+                          placeholder="Latitude"
+                          className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 mb-1 block">Longitude</label>
+                        <input
+                          type="number"
+                          step="0.0000001"
+                          value={point.lng || ''}
+                          onChange={(e) => handleRoutePointCoordinateChange(index, 'lng', e.target.value)}
+                          placeholder="Longitude"
+                          className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                    
+                    {index > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => verifyRoutePointLocation(index)}
+                        disabled={isGeocodingStarting || !point.name}
+                        className="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 disabled:opacity-50 text-sm self-start flex items-center gap-1"
+                      >
+                        {isGeocodingStarting && activePointIndex === index ? (
+                          <>
+                            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <span>Verifying...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Globe className="h-3 w-3" />
+                            <span>Verify Location</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                ))}
+                
+                <button
+                  type="button"
+                  onClick={addRoutePoint}
+                  className="mt-2 bg-gray-100 text-gray-700 px-3 py-2 rounded-md hover:bg-gray-200 text-sm flex items-center gap-1"
+                >
+                  <MapPin className="h-4 w-4" />
+                  Add Route Point
+                </button>
+              </div>
             </div>
 
             {/* Description */}
@@ -397,14 +821,21 @@ if (eventData.send_notifications) {
               </label>
             </div>
 
-            {/* Submit Button */}
-            <div className="mt-6">
+            {/* Form Buttons */}
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={clearForm}
+                className="bg-gray-100 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-200"
+              >
+                Clear Form
+              </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md disabled:opacity-50"
+                className="bg-blue-600 text-white py-2 px-4 rounded-md disabled:opacity-50 hover:bg-blue-700"
               >
-                {isSubmitting ? "Submitting..." : "Create Event"}
+                {isSubmitting ? "Creating Event..." : "Create Event"}
               </button>
             </div>
           </div>

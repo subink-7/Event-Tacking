@@ -1,460 +1,179 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState } from "react"
+import { useNavigate } from "react-router-dom"
+import { motion } from "framer-motion"
+import { FiMail, FiLock, FiEye, FiEyeOff } from "react-icons/fi"
 
-export default function NewsFeed() {
-  const [posts, setPosts] = useState([])
-  const [events, setEvents] = useState([])
-  const [selectedEvent, setSelectedEvent] = useState(null)
-  const [content, setContent] = useState("")
-  const [image, setImage] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [imagePreview, setImagePreview] = useState(null)
-  const [loadedImages, setLoadedImages] = useState({})
-  
-  // User information states from localStorage
-  const [userData, setUserData] = useState({
-    name: "User",
-    email: "",
-    id: "",
-    role: "",
-    accessToken: ""
-  })
+export default function Signup() {
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [role, setrole] = useState("")
 
-  // Base URL for API and assets
-  const BASE_URL = "http://localhost:8000/"
+  const [error, setError] = useState("")
+  const [isImageClicked, setIsImageClicked] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const navigate = useNavigate();
 
-  // Get user data from localStorage on component mount
-  useEffect(() => {
-    // Retrieve all user data from localStorage
-    const storedName = localStorage.getItem("name") || "User";
-    const storedEmail = localStorage.getItem("email") || "";
-    const storedUserId = localStorage.getItem("userid") || "";
-    const storedRole = localStorage.getItem("role") || "";
-    const storedAccessToken = localStorage.getItem("accessToken") || "";
-    
-    setUserData({
-      name: storedName,
-      email: storedEmail,
-      id: storedUserId,
-      role: storedRole,
-      accessToken: storedAccessToken
-    });
-  }, []);
-
-  // Create the Authorization header
-  const authHeader = useMemo(() => {
-    // If there's an access token, use Bearer authentication
-    if (userData.accessToken) {
-      return `Bearer ${userData.accessToken}`;
-    }
-    
-    // Fallback to Basic auth if no token is available
-    const userEmail = "khadkagokarna234@gmail.com";
-    const userPassword = "subin123";
-    return "Basic " + btoa(userEmail + ":" + userPassword);
-  }, [userData.accessToken]);
-
-  // Fetch posts and events on component mount
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch posts with authentication
-        const postsResponse = await fetch(`${BASE_URL}posts/feedback/`, {
-          headers: {
-            Authorization: authHeader,
-          },
-        })
-
-        // Fetch events with authentication
-        const eventsResponse = await fetch(`${BASE_URL}events/`, {
-          headers: {
-            Authorization: authHeader,
-          },
-        })
-
-        if (!postsResponse.ok || !eventsResponse.ok) {
-          throw new Error("Failed to fetch data")
-        }
-
-        const postsData = await postsResponse.json()
-        const eventsData = await eventsResponse.json()
-
-        setPosts(postsData)
-        setEvents(eventsData)
-        setLoading(false)
-      } catch (err) {
-        setError("Failed to fetch data. Please try again later.")
-        setLoading(false)
-        console.error("Error fetching data:", err)
-      }
-    }
-
-    fetchData()
-  }, [authHeader]);
-
-  // Handle image upload
-  const handleImageChange = (e) => {
-    const file = e.target.files[0]
-    if (file) {
-      setImage(file)
-
-      // Create preview URL
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setImagePreview(reader.result)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  const handleSubmit = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault()
 
-    if (!selectedEvent) {
-      alert("Please select an event")
+    if (!email || !password) {
+      setError("Please enter both email and password.")
       return
     }
 
-    if (!content.trim()) {
-      alert("Please enter some content")
-      return
-    }
+    setError("")
 
     try {
-      const formData = new FormData()
-      formData.append("content", content)
-      formData.append("event_id", selectedEvent.id)
-      if (image) {
-        formData.append("image", image)
-      }
-
-      const response = await fetch(`${BASE_URL}posts/feedback/${selectedEvent.id}/`, {
+      const response = await fetch("http://localhost:8000/users/api/login/", {
         method: "POST",
         headers: {
-          Authorization: authHeader,
+          "Content-Type": "application/json",
         },
-        body: formData,
+        body: JSON.stringify({ email, password, role }),
       })
 
-      if (!response.ok) {
-        throw new Error("Failed to submit feedback")
+      if (response.ok) {
+        const data = await response.json()
+        console.log("API Response:", data) // Log the response to see its structure
+
+        // Now using the correct keys for access_token and refresh_token
+        if (data.access && data.refresh) {
+          localStorage.setItem("accessToken", data.access)
+          localStorage.setItem("refreshToken", data.refresh)
+          localStorage.setItem("role", data.role)
+          localStorage.setItem("userid", data.id)
+          localStorage.setItem("name", data.name)
+          localStorage.setItem("email", data.email)
+         
+
+
+          // Check user role and redirect accordingly
+
+          if (data.role === "ADMIN") {
+            navigate("/dashboard")
+            console.log("UserRole",data.role)
+          } else {
+            navigate("/dashboard")
+          }
+        } else {
+          setError("Invalid response structure. No access token found.")
+        }
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error_message || "Login failed. Please try again.")
       }
-
-      const newPost = await response.json()
-
-      // Add the new post to the top of the posts list
-      setPosts([newPost, ...posts])
-
-      // Reset form
-      setContent("")
-      setImage(null)
-      setImagePreview(null)
-      setSelectedEvent(null)
     } catch (err) {
-      console.error("Error submitting feedback:", err)
-      alert("Failed to submit feedback. Please try again.")
+      setError("An error occurred. Please try again later.")
+      console.error(err)
     }
   }
 
-  // Function to get proper image URL
-  const getImageUrl = (imageUrl) => {
-    if (!imageUrl) return "/placeholder.svg"
-    // Remove any leading slashes or backslashes from the image path
-    const cleanedUrl = imageUrl.replace(/^[\\/]+/, '')
-    return imageUrl && !imageUrl.startsWith("http") ? `${BASE_URL}${cleanedUrl}` : imageUrl
-  }
-
-  // Function to get user display name - this checks both post user data and current user data
-  const getUserDisplayName = (user) => {
-    // If this is the current user's post and we're showing the current user data
-    if (user && userData.id && user.id === userData.id) {
-      return userData.name;
-    }
-    
-    // For other users' posts
-    if (!user) return "Anonymous User";
-    
-    if (user.username) return user.username;
-    if (user.first_name && user.last_name) return `${user.first_name} ${user.last_name}`;
-    if (user.name) return user.name;
-    if (user.email) return user.email;
-    
-    return "Anonymous User";
-  }
-
-  // Function to get user initial for avatar
-  const getUserInitial = (user) => {
-    // If this is the current user's post and we're showing the current user data
-    if (user && userData.id && user.id === userData.id) {
-      return userData.name.charAt(0).toUpperCase();
-    }
-    
-    // For other users' posts
-    if (!user) return "U";
-    
-    if (user.username) return user.username.charAt(0).toUpperCase();
-    if (user.first_name) return user.first_name.charAt(0).toUpperCase();
-    if (user.name) return user.name.charAt(0).toUpperCase();
-    if (user.email) return user.email.charAt(0).toUpperCase();
-    
-    return "U";
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <div className="bg-white p-6 max-w-md rounded-lg shadow-md">
-          <div className="text-center text-red-500 font-medium">{error}</div>
-          <button
-            className="mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition"
-            onClick={() => window.location.reload()}
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    )
+  const handleTextClick = () => {
+    setIsImageClicked(false)
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-blue-600">facebook</h1>
-          <div className="flex items-center space-x-2">
-            <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
-              <span className="text-white font-medium">{userData.name.charAt(0).toUpperCase()}</span>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="flex h-screen overflow-hidden items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5 }}
+        className="w-11/12 max-w-5xl h-4/5 bg-white flex items-stretch justify-between rounded-3xl shadow-2xl overflow-hidden"
+      >
+        {/* Left side image */}
+        <motion.div
+          className={`w-1/2 bg-cover bg-center relative cursor-pointer flex items-center justify-center transition-all duration-500 ease-in-out ${isImageClicked ? "scale-105" : ""}`}
+          style={{
+            backgroundImage: "url('/photos/katmandu.jpg')",
+          }}
+          onClick={() => setIsImageClicked(!isImageClicked)}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent rounded-l-3xl"></div>
+          <h1 className="text-5xl font-bold text-white z-10 drop-shadow-lg"></h1>
+        </motion.div>
 
-      <main className="max-w-2xl mx-auto p-4 space-y-4">
-        {/* Create Post Card */}
-        <div className="bg-white p-4 rounded-lg shadow-md">
-          <form onSubmit={handleSubmit}>
-            <div className="flex items-center space-x-2 mb-4">
-              <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
-                <span className="text-white font-medium">{userData.name.charAt(0).toUpperCase()}</span>
-              </div>
-              <div className="flex-1">
-                <select
-                  className="w-full p-2 border rounded-full bg-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={selectedEvent ? selectedEvent.id : ""}
-                  onChange={(e) => {
-                    const eventId = e.target.value
-                    const event = events.find((event) => event.id.toString() === eventId)
-                    setSelectedEvent(event)
-                  }}
-                >
-                  <option value="">Select an event to post about</option>
-                  {events.map((event) => (
-                    <option key={event.id} value={event.id}>
-                      {event.title || event.name || `Event #${event.id}`}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+        {/* Right side form */}
+        <motion.div
+          className="w-1/2 flex flex-col justify-center items-center p-12 bg-white"
+          onClick={handleTextClick}
+          initial={{ x: 50, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
+        >
+          <h2 className="text-4xl font-bold mb-2 text-gray-800">Welcome Back</h2>
+          <p className="mb-8 text-gray-600">Log in to your account</p>
 
-            <textarea
-              className="w-full p-3 border rounded-lg focus:ring-1 focus:ring-blue-500 resize-none text-lg"
-              rows="3"
-              placeholder="What's on your mind?"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-            ></textarea>
-
-            {imagePreview && (
-              <div className="relative mt-3 rounded-lg overflow-hidden">
-                <img
-                  src={imagePreview || "/placeholder.svg"}
-                  alt="Preview"
-                  className="w-full max-h-96 object-cover rounded-lg"
-                />
-                <button
-                  type="button"
-                  className="absolute top-2 right-2 bg-gray-800 bg-opacity-70 text-white p-1 rounded-full"
-                  onClick={() => {
-                    setImage(null)
-                    setImagePreview(null)
-                  }}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+          <form className="w-full max-w-md space-y-6" onSubmit={handleLogin}>
+            {error && (
+              <motion.p
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-red-500 text-center bg-red-100 p-3 rounded-lg"
+              >
+                {error}
+              </motion.p>
             )}
 
-            <div className="h-px bg-gray-200 my-4"></div>
+            {/* Email input */}
+            <div className="relative">
+              <FiMail className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6CB472] transition-all duration-300"
+              />
+            </div>
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center space-x-2 px-3 py-2 rounded-md hover:bg-gray-100 cursor-pointer text-gray-600 transition">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 text-green-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                  />
-                </svg>
-                <span className="text-sm font-medium">Photo</span>
-                <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-              </label>
-
+            {/* Password input */}
+            <div className="relative">
+              <FiLock className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6CB472] transition-all duration-300"
+              />
               <button
-                type="submit"
-                className="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md flex items-center"
-                disabled={!content.trim() || !selectedEvent}
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 mr-2"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                  />
-                </svg>
-                Post
+                {showPassword ? <FiEyeOff /> : <FiEye />}
               </button>
             </div>
+
+            {/* Submit button */}
+            <motion.button
+              type="submit"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="w-full px-6 py-3 bg-gradient-to-r from-[#6CB472] to-[#4A8C5F] text-white rounded-lg hover:from-[#5CA362] hover:to-[#3A7C4F] transition-all duration-300 shadow-lg"
+            >
+              Log In
+            </motion.button>
           </form>
-        </div>
 
-        {/* Posts Feed */}
-        <div className="space-y-4">
-          {posts.length > 0 ? (
-            posts.map((post) => (
-              <div key={post.id} className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="p-4">
-                  <div className="flex items-start space-x-3 mb-3">
-                    {post.user?.profile_picture ? (
-                      <img
-                        src={getImageUrl(post.user.profile_picture)}
-                        alt={getUserDisplayName(post.user)}
-                        className="w-10 h-10 rounded-full object-cover"
-                        onError={(e) => {
-                          e.target.src = "/placeholder.svg"
-                        }}
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
-                        <span className="text-white font-bold">
-                          {getUserInitial(post.user)}
-                        </span>
-                      </div>
-                    )}
+          <p className="mt-8 text-sm text-gray-600">
+            Forgot your password?{" "}
+            <a href="#" className="text-[#6CB472] hover:underline">
+              Reset it here
+            </a>
 
-                    <div>
-                      <h3 className="font-semibold">
-                        {getUserDisplayName(post.user)}
-                      </h3>
-                      <p className="text-gray-500 text-xs">
-                        {post.created_at ? new Date(post.created_at).toLocaleString() : "Unknown date"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {post.event && (
-                    <div className="mb-3 text-sm bg-gray-50 p-2 rounded">
-                      <span className="font-medium">Event: </span>
-                      {post.event.title || post.event.name || `Event #${post.event.id}`}
-                    </div>
-                  )}
-
-                  <p className="mb-3 whitespace-pre-line">{post.content}</p>
-                </div>
-
-                {post.image_url && (
-                  <div className="w-full">
-                    <img
-                      src={getImageUrl(post.image_url)}
-                      alt="Post attachment"
-                      className={`w-full max-h-[500px] object-cover ${
-                        loadedImages[post.id] ? 'opacity-100' : 'opacity-0'
-                      } transition-opacity duration-300`}
-                      onLoad={() => setLoadedImages(prev => ({...prev, [post.id]: true}))}
-                      onError={(e) => {
-                        e.target.src = "/placeholder.svg";
-                        setLoadedImages(prev => ({...prev, [post.id]: true}));
-                      }}
-                    />
-                  </div>
-                )}
-
-                {/* Comment input section */}
-                <div className="p-3 flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">
-                    <span className="text-white font-bold">{userData.name.charAt(0).toUpperCase()}</span>
-                  </div>
-                  <div className="flex-1 relative">
-                    <input
-                      type="text"
-                      placeholder="Write a comment..."
-                      className="w-full py-2 px-3 bg-gray-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <button className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="bg-white p-8 text-center rounded-lg shadow-md">
-              <div className="text-gray-500">No posts yet. Be the first to share your feedback!</div>
-            </div>
-          )}
-        </div>
-      </main>
+          </p>
+          <div className="mt-5">
+          <a href="/" className="text-[#6CB472] ">
+             <span className="text-red-500 mt-10">Don't have account?</span><span className="hover:underline">Register here</span> 
+            </a>
+          </div>
+        </motion.div>
+      </motion.div>
     </div>
   )
 }

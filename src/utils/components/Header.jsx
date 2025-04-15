@@ -11,6 +11,7 @@ export function Header() {
     !!localStorage.getItem("accessToken")
   );
   const [userName, setUserName] = React.useState(""); 
+  const [userRole, setUserRole] = React.useState("");
   const navigate = useNavigate();
   
   // Check for both access and refresh tokens on component mount and updates
@@ -29,10 +30,16 @@ export function Header() {
         // refreshAccessToken(refreshToken);
       }
       
-      // Set user name
+      // Set user name and role
       const storedUser = localStorage.getItem("name");
+      const storedRole = localStorage.getItem("role");
+      
       if (storedUser) {
         setUserName(storedUser);
+      }
+      
+      if (storedRole) {
+        setUserRole(storedRole);
       }
     };
     
@@ -55,34 +62,12 @@ export function Header() {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("name");
+    localStorage.removeItem("role");
     setUserName(""); 
+    setUserRole("");
     setIsLoggedIn(false);
     navigate("/login");
   };
-
-  // Optional: You could implement a function to refresh the access token
-  // const refreshAccessToken = async (refreshToken) => {
-  //   try {
-  //     const response = await fetch('/api/refresh-token', {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //       },
-  //       body: JSON.stringify({ refreshToken }),
-  //     });
-  //     const data = await response.json();
-  //     if (data.accessToken) {
-  //       localStorage.setItem("accessToken", data.accessToken);
-  //       // Update login state
-  //       setIsLoggedIn(true);
-  //     }
-  //   } catch (error) {
-  //     console.error('Failed to refresh token:', error);
-  //     // Handle refresh token failure (maybe redirect to login)
-  //     setIsLoggedIn(false);
-  //     navigate("/login");
-  //   }
-  // };
 
   const goToProfile = () => navigate("/profile");
   const goToHome = () => navigate("/dashboard");
@@ -90,19 +75,22 @@ export function Header() {
   const goToNewsFeed = () => navigate("/newsfeed");
   const goToNotification = () => navigate("/notification");
   const goToEventCard = () => navigate("/alleventpage");
-
+  const goToCreateEvent = () => navigate("/admindashboard");
+const goToDashboard = () => navigate("/dashboard")
   return (
     <header className="sticky top-0 z-30 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between py-4">
         <div className="flex items-center gap-4">
-          <div className="flex items-center justify-center rounded-md bg-primary/10 p-2">
+          <div className="flex items-center justify-center rounded-md bg-primary/10 p-2 cursor-pointer"
+          onClick={goToDashboard}>
             <img
               src="https://cdn.builder.io/api/v1/image/assets/TEMP/23df5bfe05e34071448b6849aa6a1c93fd6d0ac3f66bc043b442e76d6815eb51?placeholderIfAbsent=true&apiKey=003454df7a3c4f25a3bd7334b00a00cf"
               alt="Company logo"
               className="h-8 w-8"
             />
           </div>
-          <span className="hidden text-xl font-semibold sm:inline-block">
+          <span className="hidden text-xl font-semibold sm:inline-block cursor-pointer
+           " onClick={goToDashboard}>
             EventYatra
           </span>
         </div>
@@ -126,7 +114,12 @@ export function Header() {
            className="text-lg font-medium text-foreground/70 hover:text-foreground">
              Event Feed
           </button>
-         
+          {userRole === "ADMIN" && (
+            <button onClick={goToCreateEvent}
+             className="text-lg font-medium text-foreground/70 hover:text-foreground">
+             Create Event 
+            </button>
+          )}
         </nav>
 
         <div className="flex items-center gap-4">
