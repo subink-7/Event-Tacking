@@ -32,7 +32,7 @@ function Eventcard({ id, title, date, time, starting_point, route, description, 
         </div>
         <h3 className="text-2xl font-bold mb-2 group-hover:text-red-300 transition-colors">{title}</h3>
         <p className="text-white/80 text-sm mb-2">Starting Point: {starting_point}</p>
-        <p className="text-white/80 text-sm mb-2">Route: {displayRoute}</p>
+        {/* <p className="text-white/80 text-sm mb-2">Route: {displayRoute}</p> */}
         <p className="text-white/80 text-sm line-clamp-2">{description}</p>
         
         <Link 

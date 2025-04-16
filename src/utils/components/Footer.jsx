@@ -3,7 +3,7 @@ import * as React from "react";
 export function Footer() {
   return (
     <div className="flex overflow-hidden flex-col justify-center self-stretch px-20 py-8 mt-28 w-full bg-red-500 bg-opacity-10 max-md:px-5 max-md:mt-10 max-md:max-w-full">
-      <div className="flex flex-col justify-center py-12 pr-24 pl-24 w-full bg-red-50 rounded-2xl max-md:px-5 max-md:max-w-full">
+      <div className="flex flex-col  py-12 pr-24 pl-24 w-full bg-red-50 rounded-2xl max-md:px-5 max-md:max-w-full justify-between">
         <div className="flex flex-wrap gap-10 items-center max-md:max-w-full">
           <div className="self-stretch my-auto text-2xl font-medium leading-8 text-center text-red-500">
             Promote culture, preserve

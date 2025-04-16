@@ -47,7 +47,7 @@ export default function Signup() {
           localStorage.setItem("name", data.name)
           localStorage.setItem("email", data.email)
          
-
+          console.log("Storing token for user ID:", data.id);
 
           // Check user role and redirect accordingly
 

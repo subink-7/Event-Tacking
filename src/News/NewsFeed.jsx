@@ -1,9 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { CgProfile } from "react-icons/cg"
+import { useState, useEffect, useRef } from "react"
+
+import { FaHeart, FaRegHeart, FaComment } from "react-icons/fa"
+
 import { Header } from "../utils/components/Header"
 import { Footer } from "../utils/components/Footer"
+
 
 export default function NewsFeed() {
   const [posts, setPosts] = useState([])
@@ -17,17 +20,56 @@ export default function NewsFeed() {
   const [loadedImages, setLoadedImages] = useState({})
   const [username, setUsername] = useState("User")
   const [isReloading, setIsReloading] = useState(false)
+  const [commentText, setCommentText] = useState("")
+  const [activeCommentPost, setActiveCommentPost] = useState(null)
+  const [showLikersTooltip, setShowLikersTooltip] = useState(null)
+  const [likersList, setLikersList] = useState({})
+  
+  // Pagination state variables
+  const [currentPage, setCurrentPage] = useState(1)
+  const [hasMorePosts, setHasMorePosts] = useState(true)
+  const [postsPerPage] = useState(5)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [allPosts, setAllPosts] = useState([])
+  
+  // Ref for infinite scroll
+  const observerRef = useRef(null)
+  const lastPostRef = useRef(null)
 
   // Base URL for API and assets
   const BASE_URL = "http://localhost:8000/"
 
   // Get JWT token from localStorage
-// In NewsFeed.js
-const getAuthHeader = () => {
-  const token = localStorage.getItem("access") // Now matches login component
-  return token ? { Authorization: `Bearer ${token}` } : null
-}
+  const getAuthHeader = () => {
+    const token = localStorage.getItem("accessToken")
+    return token ? { Authorization: `Bearer ${token}` } : null
+  }
 
+  // Refresh token function
+  const refreshToken = async () => {
+    try {
+      const refreshToken = localStorage.getItem("refreshToken")
+      if (!refreshToken) return false
+      
+      const response = await fetch(`${BASE_URL}api/token/refresh/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ refresh: refreshToken }),
+      })
+  
+      if (!response.ok) return false
+  
+      const data = await response.json()
+      localStorage.setItem("accessToken", data.access)
+      return true
+    } catch (error) {
+      console.error("Token refresh failed:", error)
+      return false
+    }
+  }
+  
   // Fetch data with authentication
   const fetchWithAuth = async (url, options = {}) => {
     const authHeader = getAuthHeader()
@@ -64,31 +106,6 @@ const getAuthHeader = () => {
     }
   }
 
-  // Refresh token function
-  const refreshToken = async () => {
-    try {
-      const refreshToken = localStorage.getItem("refresh")
-      if (!refreshToken) return false
-
-      const response = await fetch(`${BASE_URL}api/token/refresh/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ refresh: refreshToken }),
-      })
-
-      if (!response.ok) return false
-
-      const data = await response.json()
-      localStorage.setItem("access", data.access)
-      return true
-    } catch (error) {
-      console.error("Token refresh failed:", error)
-      return false
-    }
-  }
-
   // Get user name from localStorage on component mount
   useEffect(() => {
     const storedName = localStorage.getItem("name")
@@ -96,6 +113,32 @@ const getAuthHeader = () => {
       setUsername(storedName)
     }
   }, [])
+
+  // Setup intersection observer for infinite scrolling
+  useEffect(() => {
+    if (!hasMorePosts) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !isLoadingMore) {
+          loadMorePosts();
+        }
+      },
+      { threshold: 0.5 }
+    );
+
+    observerRef.current = observer;
+    
+    if (lastPostRef.current) {
+      observer.observe(lastPostRef.current);
+    }
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [posts, isLoadingMore, hasMorePosts]);
 
   // Fetch posts and events on component mount
   useEffect(() => {
@@ -113,7 +156,13 @@ const getAuthHeader = () => {
           eventsResponse.json(),
         ])
 
-        setPosts(postsData)
+        setAllPosts(postsData)
+        
+        // Initial pagination
+        const initialPosts = postsData.slice(0, postsPerPage)
+        setPosts(initialPosts)
+        setHasMorePosts(postsData.length > postsPerPage)
+        
         setEvents(eventsData)
       } catch (error) {
         setError(error.message)
@@ -125,6 +174,28 @@ const getAuthHeader = () => {
 
     fetchData()
   }, [])
+
+  // Load more posts for pagination
+  const loadMorePosts = () => {
+    if (!hasMorePosts || isLoadingMore) return;
+    
+    setIsLoadingMore(true);
+    
+    const nextPage = currentPage + 1;
+    const startIndex = currentPage * postsPerPage;
+    const endIndex = startIndex + postsPerPage;
+    const nextPosts = allPosts.slice(startIndex, endIndex);
+    
+    if (nextPosts.length > 0) {
+      setPosts(prevPosts => [...prevPosts, ...nextPosts]);
+      setCurrentPage(nextPage);
+      setHasMorePosts(endIndex < allPosts.length);
+    } else {
+      setHasMorePosts(false);
+    }
+    
+    setIsLoadingMore(false);
+  };
 
   // Handle image upload
   const handleImageChange = (e) => {
@@ -165,7 +236,11 @@ const getAuthHeader = () => {
       )
 
       const newPost = await response.json()
-      setPosts([newPost, ...posts])
+      
+      // Update both allPosts and the paginated posts
+      setAllPosts(prevPosts => [newPost, ...prevPosts])
+      setPosts(prevPosts => [newPost, ...prevPosts])
+      
       setContent("")
       setImage(null)
       setImagePreview(null)
@@ -173,6 +248,216 @@ const getAuthHeader = () => {
     } catch (error) {
       alert(`Post failed: ${error.message}`)
       console.error("Post error:", error)
+    }
+  }
+
+  // Function to fetch likes details for a post
+  // Function to fetch likes details for a post
+const fetchLikesDetails = async (postId) => {
+  if (likersList[postId]) {
+    return likersList[postId] // Use cached data if available
+  }
+  
+  try {
+    const response = await fetchWithAuth(`${BASE_URL}posts/feedback/${postId}/likes/`)
+    const likesData = await response.json()
+    
+    // Process the likes data to ensure it has the correct format
+    const processedLikes = likesData.map(like => {
+      // If the like contains user_detail, return that
+      if (like.user_detail) {
+        return like.user_detail
+      }
+      // Otherwise create a placeholder user object with the available data
+      return {
+        id: like.user,
+        username: null,
+        first_name: null,
+        last_name: null,
+        email: `User ${like.user}` // Fallback display name
+      }
+    })
+    
+    // Cache the processed likes data
+    setLikersList(prev => ({
+      ...prev,
+      [postId]: processedLikes
+    }))
+    
+    return processedLikes
+  } catch (error) {
+    console.error("Fetch likes error:", error)
+    return []
+  }
+}
+
+  // Function to handle liking a post
+const handleLike = async (postId) => {
+  try {
+    const response = await fetchWithAuth(
+      `${BASE_URL}posts/feedback/${postId}/like/`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    )
+
+    // Update both allPosts and the paginated posts using a consistent function
+    const updatePostsInArray = (postsArray) => {
+      return postsArray.map(post => {
+        if (post.id === postId) {
+          return {
+            ...post,
+            likes_count: post.likes_count + 1,
+            is_liked_by_user: true
+          }
+        }
+        return post
+      })
+    }
+
+    setAllPosts(prevPosts => updatePostsInArray(prevPosts))
+    setPosts(prevPosts => updatePostsInArray(prevPosts))
+    
+    // Clear cached likers list to fetch updated data next time
+    setLikersList(prev => {
+      const newList = {...prev}
+      delete newList[postId]
+      return newList
+    })
+  } catch (error) {
+    console.error("Like error:", error)
+    alert("Failed to like post")
+  }
+}
+
+// Similarly, update the handleUnlike function too
+const handleUnlike = async (postId) => {
+  try {
+    await fetchWithAuth(
+      `${BASE_URL}posts/feedback/${postId}/like/`,
+      {
+        method: "DELETE",
+      }
+    )
+
+    // Update both allPosts and the paginated posts
+    const updatePostsInArray = (postsArray) => {
+      return postsArray.map(post => {
+        if (post.id === postId) {
+          return {
+            ...post,
+            likes_count: post.likes_count > 0 ? post.likes_count - 1 : 0,
+            is_liked_by_user: false
+          }
+        }
+        return post
+      })
+    }
+    
+    setAllPosts(prevPosts => updatePostsInArray(prevPosts))
+    setPosts(prevPosts => updatePostsInArray(prevPosts))
+    
+    // Clear cached likers list to fetch updated data next time
+    setLikersList(prev => {
+      const newList = {...prev}
+      delete newList[postId]
+      return newList
+    })
+  } catch (error) {
+    console.error("Unlike error:", error)
+    alert("Failed to unlike post")
+  }
+}
+
+  // Function to handle clicking on a post to like/unlike (Instagram style)
+  const handlePostClick = (postId, isLiked) => {
+    if (isLiked) {
+      handleUnlike(postId)
+    } else {
+      handleLike(postId)
+    }
+  }
+
+  // Function to handle adding a comment
+  const handleAddComment = async (postId) => {
+    if (!commentText.trim()) return
+
+    try {
+      const response = await fetchWithAuth(
+        `${BASE_URL}posts/feedback/${postId}/comments/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ content: commentText }),
+        }
+      )
+
+      const newComment = await response.json()
+      
+      // Update both allPosts and paginated posts
+      const updatePostsInArray = (postsArray) => {
+        return postsArray.map(post => {
+          if (post.id === postId) {
+            return {
+              ...post,
+              comments: [...(post.comments || []), newComment]
+            }
+          }
+          return post
+        })
+      }
+      
+      setAllPosts(updatePostsInArray)
+      setPosts(updatePostsInArray)
+      
+      setCommentText("")
+    } catch (error) {
+      console.error("Comment error:", error)
+      alert("Failed to add comment")
+    }
+  }
+
+  // Function to fetch comments for a post
+  const fetchComments = async (postId) => {
+    try {
+      const response = await fetchWithAuth(
+        `${BASE_URL}posts/feedback/${postId}/comments/`
+      )
+      
+      const comments = await response.json()
+      
+      // Update both allPosts and paginated posts
+      const updatePostsInArray = (postsArray) => {
+        return postsArray.map(post => {
+          if (post.id === postId) {
+            return {
+              ...post,
+              comments: comments
+            }
+          }
+          return post
+        })
+      }
+      
+      setAllPosts(updatePostsInArray)
+      setPosts(updatePostsInArray)
+    } catch (error) {
+      console.error("Fetch comments error:", error)
+    }
+  }
+
+  // Function to toggle comment section
+  const toggleComments = (postId) => {
+    if (activeCommentPost === postId) {
+      setActiveCommentPost(null) // Close comments
+    } else {
+      setActiveCommentPost(postId) // Open comments
+      fetchComments(postId) // Fetch comments when opening
     }
   }
 
@@ -193,10 +478,21 @@ const getAuthHeader = () => {
            "User"
   }
 
+  // Show likers tooltip
+  const handleLikesHover = async (postId) => {
+    await fetchLikesDetails(postId)
+    setShowLikersTooltip(postId)
+  }
+
+  // Hide likers tooltip
+  const handleLikesLeave = () => {
+    setShowLikersTooltip(null)
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     )
   }
@@ -234,11 +530,11 @@ const getAuthHeader = () => {
   return (
     <div className="min-h-screen bg-[#fcf9f5] font-sans">
       {/* Header */}
-      <div className="relative z-10 w-full bg-white/80 backdrop-blur-sm shadow-sm">
+      <div className="sticky top-0 z-10 w-full bg-white/90 backdrop-blur-sm shadow-sm">
         <Header/>
       </div>
 
-      <main className="max-w-2xl mx-auto p-4 space-y-4">
+      <main className="max-w-2xl mx-auto p-4 space-y-6">
         {/* Create Post Card */}
         <div className="bg-white p-4 rounded-lg shadow-md">
           <form onSubmit={handleSubmit}>
@@ -358,11 +654,19 @@ const getAuthHeader = () => {
         {/* Posts Feed */}
         <div className="space-y-4">
           {posts.length > 0 ? (
-            posts.map((post) => (
-              <div key={post.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+            posts.map((post, index) => (
+              <div 
+                key={post.id} 
+                className="bg-white rounded-lg shadow-md overflow-hidden"
+                ref={index === posts.length - 1 ? lastPostRef : null}
+              >
                 <div className="p-4">
                   <div className="flex items-start space-x-3 mb-3">
-                    <CgProfile className="h-10 w-10 text-blue-600"/>
+                    <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
+                      <span className="text-white font-medium">
+                        {getDisplayName(post.user_detail).charAt(0).toUpperCase()}
+                      </span>
+                    </div>
                     <div>
                       <h3 className="font-semibold">
                         {getDisplayName(post.user_detail) || username}
@@ -384,7 +688,10 @@ const getAuthHeader = () => {
                 </div>
 
                 {post.image_url && (
-                  <div className="w-full">
+                  <div 
+                    className="w-full relative cursor-pointer"
+                    onClick={() => handlePostClick(post.id, post.is_liked_by_user)}
+                  >
                     <img
                       src={getImageUrl(post.image_url)}
                       alt="Post attachment"
@@ -397,6 +704,125 @@ const getAuthHeader = () => {
                         setLoadedImages(prev => ({...prev, [post.id]: true}))
                       }}
                     />
+                    
+                    {/* Double-click like animation */}
+                    {post.is_liked_by_user && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <FaHeart className="text-red-500 text-6xl animate-pulse" />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Like, likers tooltip and Comment buttons */}
+                <div className="px-4 py-3 border-t flex items-center space-x-6">
+                  <div className="relative">
+                    <button 
+                      onClick={() => post.is_liked_by_user ? handleUnlike(post.id) : handleLike(post.id)}
+                      onMouseEnter={() => handleLikesHover(post.id)}
+                      onMouseLeave={handleLikesLeave}
+                      className="flex items-center space-x-2 text-gray-600 hover:text-red-500 transition"
+                    >
+                      {post.is_liked_by_user ? (
+                        <FaHeart className="text-red-500 hover:scale-110 transition-transform" />
+                      ) : (
+                        <FaRegHeart className="hover:scale-110 transition-transform" />
+                      )}
+                      <span>{post.likes_count || 0} Likes</span>
+                    </button>
+                    
+                    {/* Tooltip showing who liked the post */}
+                    {showLikersTooltip === post.id && post.likes_count > 0 && (
+                      <div className="absolute bottom-full left-0 mb-2 bg-white shadow-lg rounded-lg p-2 w-56 max-h-32 overflow-y-auto z-10">
+                        <div className="text-sm font-medium mb-1 border-b pb-1">Liked by:</div>
+                        <ul className="text-xs space-y-1">
+                          {likersList[post.id] && likersList[post.id].length > 0 ? (
+                            likersList[post.id].map((liker, i) => (
+                              <li key={i} className="flex items-center space-x-2">
+                                <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs">
+                                  {getDisplayName(liker).charAt(0).toUpperCase()}
+                                </div>
+                                <span>{getDisplayName(liker)}</span>
+                              </li>
+                            ))
+                          ) : (
+                            <li>Loading likers...</li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <button 
+                    onClick={() => toggleComments(post.id)}
+                    className="flex items-center space-x-2 text-gray-600 hover:text-blue-500 transition"
+                  >
+                    <FaComment className="hover:scale-110 transition-transform" />
+                    <span>{post.comments?.length || 0} Comments</span>
+                  </button>
+                </div>
+
+                {/* Comments section - shows when activeCommentPost matches this post id */}
+                {activeCommentPost === post.id && (
+                  <div className="border-t px-4 py-3 bg-gray-50">
+                    {/* Display comments */}
+                    <div className="space-y-3 mb-3">
+                      {post.comments && post.comments.length > 0 ? (
+                        post.comments.map((comment) => (
+                          <div key={comment.id} className="flex space-x-2">
+                            <div className="w-8 h-8 rounded-full bg-blue-500 flex-shrink-0 flex items-center justify-center">
+                              <span className="text-white text-xs font-medium">
+                                {getDisplayName(comment.user_detail).charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="flex-1 bg-white p-2 rounded-lg shadow-sm">
+                              <div className="flex justify-between items-start">
+                                <span className="font-medium text-sm">
+                                  {getDisplayName(comment.user_detail)}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  {new Date(comment.created_at).toLocaleString()}
+                                </span>
+                              </div>
+                              <p className="text-sm mt-1">{comment.content}</p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-gray-500 text-center">No comments yet</p>
+                      )}
+                    </div>
+
+                    {/* Add comment form */}
+                    <div className="flex space-x-2 mt-3">
+                      <div className="w-8 h-8 rounded-full bg-blue-500 flex-shrink-0 flex items-center justify-center">
+                        <span className="text-white text-xs font-medium">
+                          {username.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="flex-1 flex">
+                        <input
+                          type="text"
+                          className="flex-1 border rounded-l-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          placeholder="Write a comment..."
+                          value={commentText}
+                          onChange={(e) => setCommentText(e.target.value)}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter' && commentText.trim()) {
+                              e.preventDefault();
+                              handleAddComment(post.id);
+                            }
+                          }}
+                        />
+                        <button
+                          className="bg-blue-500 text-white px-3 rounded-r-lg hover:bg-blue-600 transition"
+                          onClick={() => handleAddComment(post.id)}
+                          disabled={!commentText.trim()}
+                        >
+                          Send
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

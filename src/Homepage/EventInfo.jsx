@@ -20,8 +20,168 @@ export default function EventInfo() {
   // State for map markers
   const [mapMarkers, setMapMarkers] = useState([])
   const [mapCenter, setMapCenter] = useState([27.7172, 85.3240]) // Default to Kathmandu
+  const [routeArray, setRouteArray] = useState([])
+  const [polylinePoints, setPolylinePoints] = useState([])
 
   const goto = () => navigate("/calendar")
+
+  // Extract route data using regex when JSON parsing fails
+  const extractRouteWithRegex = (routeString) => {
+    try {
+      const result = [];
+      
+      // Extract lat values
+      const latMatches = routeString.match(/"lat":\s*([0-9.-]+)/g);
+      const lngMatches = routeString.match(/"lng":\s*([0-9.-]+)/g);
+      const nameMatches = routeString.match(/"name":\s*"([^"]+)"/g);
+      
+      if (latMatches && lngMatches) {
+        const lats = latMatches.map(match => parseFloat(match.split(':')[1].trim()));
+        const lngs = lngMatches.map(match => parseFloat(match.split(':')[1].trim()));
+        const names = nameMatches ? 
+          nameMatches.map(match => match.match(/"name":\s*"([^"]+)"/)[1]) : 
+          Array(lats.length).fill('Unnamed Point');
+        
+        for (let i = 0; i < Math.min(lats.length, lngs.length); i++) {
+          result.push({
+            lat: lats[i],
+            lng: lngs[i],
+            name: i < names.length ? names[i] : `Point ${i+1}`
+          });
+        }
+      }
+      
+      return result.length > 0 ? result : null;
+    } catch (error) {
+      console.error("Error in regex extraction:", error);
+      return null;
+    }
+  };
+
+
+  const processEventData = (eventData) => {
+    if (!eventData) {
+      console.log("No event data provided.");
+      // Reset states if needed when data is cleared
+      setMapMarkers([]);
+      setPolylinePoints([]);
+      setRouteArray([]);
+      // setMapCenter(DEFAULT_CENTER); // Optional: reset center
+      return;
+    }
+  
+    console.log("Processing event data:", eventData);
+  
+    // Initialize defaults or clear previous state
+    let markers = [];
+    let polylinePoints = [];
+    let routeNames = [];
+    let centerSet = false; // Flag to track if map center was set from route
+  
+    // --- Process Route Data ---
+    if (eventData.route) {
+      try {
+        let routeData;
+        let routeString = eventData.route; // Get the raw route value
+  
+        // --- Route Parsing ---
+        if (typeof routeString === 'string') {
+           console.log("Route is a string, attempting to parse:", routeString);
+          // Clean up potential outer quotes (defensive programming)
+          if (routeString.startsWith('"') && routeString.endsWith('"')) {
+            routeString = routeString.slice(1, -1);
+          }
+          // Unescape inner quotes if necessary (e.g., if JSON was double-encoded)
+          routeString = routeString.replace(/\\"/g, '"');
+  
+          try {
+            routeData = JSON.parse(routeString);
+            console.log("Successfully parsed route string:", routeData);
+          } catch (parseError) {
+            console.error("Error parsing route string as JSON:", parseError, "Route string was:", routeString);
+            // Optional: Add fallback regex parsing here if JSON often fails
+            routeData = null; // Parsing failed
+          }
+        } else if (typeof routeString === 'object') {
+           console.log("Route is already an object:", routeString);
+          // It might already be an object (less likely based on your example, but good to handle)
+          routeData = routeString;
+        } else {
+           console.warn("Route data is not a string or object:", routeString);
+           routeData = null;
+        }
+        // --- End Route Parsing ---
+  
+  
+        // --- Use Parsed Data ---
+        if (Array.isArray(routeData) && routeData.length > 0) {
+           // Filter out any invalid points (missing lat/lng) just in case
+           const validPoints = routeData.filter(p => p && typeof p.lat === 'number' && typeof p.lng === 'number');
+  
+           if (validPoints.length > 0) {
+               // 1. Set Map Center using the first valid point
+               const firstPoint = validPoints[0];
+               setMapCenter([parseFloat(firstPoint.lat), parseFloat(firstPoint.lng)]);
+               console.log("Setting map center to first route point:", [firstPoint.lat, firstPoint.lng]);
+               centerSet = true; // Mark that center was set
+  
+               // 2. Create Markers
+               markers = validPoints.map((point, index) => ({
+                   position: [parseFloat(point.lat), parseFloat(point.lng)],
+                   title: point.name || `Point ${index + 1}`, // Use name or fallback
+                   description: index === 0 ? "Starting Point" :
+                                index === validPoints.length - 1 ? "Final Destination" :
+                                "Checkpoint",
+                   index: index + 1,
+                   // isRoutePoint: !!point.isRoutePoint // Keep if you use this property
+               }));
+               console.log("Created markers:", markers);
+  
+               // 3. Extract Polyline points
+               polylinePoints = markers.map(marker => marker.position);
+               console.log("Created polyline points:", polylinePoints);
+  
+               // 4. Extract Route Names
+               routeNames = validPoints.map(point => point.name || `Point ${point.index || 'N/A'}`); // Use name or fallback
+               console.log("Extracted route names:", routeNames);
+  
+           } else {
+               console.warn("Parsed route data contained no valid points with lat/lng.");
+           }
+        } else {
+          console.warn("No valid route data found after parsing or route array is empty.");
+        }
+      } catch (error) {
+        // Catch errors during the route processing block
+        console.error("Error processing route data:", error);
+      }
+    } else {
+      console.log("No route data found in eventData.");
+    }
+    // --- End Process Route Data ---
+  
+  
+    // --- Update State ---
+    setMapMarkers(markers);
+    setPolylinePoints(polylinePoints);
+    setRouteArray(routeNames);
+  
+    // Optional: Fallback map center if route didn't provide one
+    // if (!centerSet) {
+    //    console.log("Setting default map center (no route data).");
+    //    setMapCenter(DEFAULT_CENTER); // Set to a default location
+    // }
+  
+  };
+  
+  // --- Helper Function Example (if needed for fallback) ---
+  // const extractRouteWithRegex = (routeString) => {
+  //    // Implement regex logic here ONLY if JSON.parse consistently fails
+  //    // This is generally less reliable than JSON.parse
+  //    console.warn("Falling back to regex extraction for route:", routeString);
+  //    // ... regex implementation ...
+  //    return []; // Return empty array or extracted data
+  // }
 
   useEffect(() => {
     // If eventData was passed via location state, use it directly
@@ -50,142 +210,16 @@ export default function EventInfo() {
           console.error("Error fetching event:", error)
           setLoading(false)
         })
+    } else {
+      // No id provided, set loading to false
+      setLoading(false)
     }
   }, [id, eventData])
 
-  // Process event data for map markers
-// Process event data for map markers
-const processEventData = (eventData) => {
-  if (eventData) {
-    console.log("Processing event data:", eventData);
-    
-    // Set the map center
-    if (eventData.latitude && eventData.longitude) {
-      setMapCenter([parseFloat(eventData.latitude), parseFloat(eventData.longitude)]);
-      
-      // Process route data
-      if (eventData.route) {
-        try {
-          // First, remove the outer quotes if they exist
-          let routeString = eventData.route;
-          if (routeString.startsWith('"') && routeString.endsWith('"')) {
-            routeString = routeString.slice(1, -1);
-          }
-          
-          // Then unescape the inner quotes
-          routeString = routeString.replace(/\\"/g, '"');
-          
-          console.log("Cleaned route string:", routeString);
-          const routeData = JSON.parse(routeString);
-          console.log("Parsed route data:", routeData);
-          
-          if (Array.isArray(routeData)) {
-            const markers = routeData.map((point, index) => {
-              return {
-                position: [parseFloat(point.lat), parseFloat(point.lng)],
-                title: point.name,
-                description: index === 0 ? "Starting Point" : 
-                          index === routeData.length - 1 ? "Final Destination" : 
-                          "Checkpoint",
-                index: index + 1
-              };
-            });
-            
-            console.log("Created markers:", markers);
-            setMapMarkers(markers);
-          }
-        } catch (error) {
-          console.error("Error parsing route data:", error);
-          
-          // Fallback to regex approach if JSON parsing fails
-          try {
-            const routeStr = eventData.route;
-            const regex = /"name":"([^"]+)"[^"]*"lat":([^,]+)[^"]*"lng":([^}]+)/g;
-            const markers = [];
-            let match;
-            let index = 1;
-            
-            while ((match = regex.exec(routeStr)) !== null) {
-              const [_, name, lat, lng] = match;
-              markers.push({
-                position: [parseFloat(lat), parseFloat(lng)],
-                title: name,
-                description: index === 1 ? "Starting Point" : "Checkpoint",
-                index: index
-              });
-              index++;
-            }
-            
-            // Update the last point's description if we have multiple points
-            if (markers.length > 1) {
-              markers[markers.length - 1].description = "Final Destination";
-            }
-            
-            console.log("Created markers with regex fallback:", markers);
-            setMapMarkers(markers);
-          } catch (regexError) {
-            console.error("Regex fallback also failed:", regexError);
-          }
-        }
-      }
-    }
-  }
-};
-  // Parse route string into an array if it's a string
-// Parse route data
-const getRouteArray = () => {
-  if (!event?.route) return [];
-  
-  try {
-    // First clean the route string
-    let routeString = event.route;
-    if (typeof routeString === 'string') {
-      if (routeString.startsWith('"') && routeString.endsWith('"')) {
-        routeString = routeString.slice(1, -1);
-      }
-      routeString = routeString.replace(/\\"/g, '"');
-      
-      const routeData = JSON.parse(routeString);
-      return Array.isArray(routeData) ? routeData.map(point => point.name) : [];
-    }
-    return [];
-  } catch (error) {
-    console.error("Error parsing route names:", error);
-    
-    // Regex fallback for route names
-    try {
-      const routeStr = event.route;
-      const regex = /"name":"([^"]+)"/g;
-      const names = [];
-      let match;
-      
-      while ((match = regex.exec(routeStr)) !== null) {
-        names.push(match[1]);
-      }
-      
-      return names;
-    } catch (regexError) {
-      console.error("Regex fallback for names failed:", regexError);
-      return [];
-    }
-  }
-};
-
-const routeArray = getRouteArray()
-
   // Format image URL
-
-  
-
-  // Create polyline points for the route
-  const polylinePoints = mapMarkers.map(marker => marker.position)
-  console.log (polylinePoints)
-  console.log (routeArray)
-
-  const imageUrl =
-    event?.image && !event.image.startsWith("http")
-      ? `http://127.0.0.1:8000/${event.image}`
-      : event?.image || "/placeholder.svg"
+  const imageUrl = event?.image && !event.image.startsWith("http")
+    ? `http://127.0.0.1:8000/${event.image}`
+    : event?.image || "/placeholder.svg"
 
   if (loading) {
     return (
@@ -345,7 +379,14 @@ const routeArray = getRouteArray()
           </div>
           
           <div className="mt-6 bg-gray-50 p-4 rounded-lg text-sm text-gray-600">
-            <p>The map shows the event route from {routeArray[0]} to {routeArray[routeArray.length - 1]}. Click on markers to see details.</p>
+            {routeArray.length > 0 ? (
+              <p>
+                The map shows the event route from {routeArray[0]} to {routeArray[routeArray.length - 1]}. 
+                Click on markers to see details.
+              </p>
+            ) : (
+              <p>Route information not available. Click on markers to see details.</p>
+            )}
           </div>
         </div>
       </div>
@@ -357,45 +398,51 @@ const routeArray = getRouteArray()
             Route Details
           </h2>
 
-          <div className="relative">
-            {/* Route path visualization */}
-            <div className="absolute left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-rose-500 to-amber-500 rounded-full"></div>
+          {routeArray.length > 0 ? (
+            <div className="relative">
+              {/* Route path visualization */}
+              <div className="absolute left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-rose-500 to-amber-500 rounded-full"></div>
 
-            <ul className="space-y-8 pl-12 relative">
-              {routeArray.map((stop, index) => (
-                <li key={index} className="relative">
-                  {/* Circle marker */}
-                  <div className="absolute left-[-32px] w-8 h-8 bg-white rounded-full border-2 border-rose-500 flex items-center justify-center shadow-md">
-                    <span className="text-sm font-bold text-rose-500">{index + 1}</span>
-                  </div>
+              <ul className="space-y-8 pl-12 relative">
+                {routeArray.map((stop, index) => (
+                  <li key={index} className="relative">
+                    {/* Circle marker */}
+                    <div className="absolute left-[-32px] w-8 h-8 bg-white rounded-full border-2 border-rose-500 flex items-center justify-center shadow-md">
+                      <span className="text-sm font-bold text-rose-500">{index + 1}</span>
+                    </div>
 
-                  <div
-                    className={`bg-gradient-to-r ${index === 0 ? "from-rose-50 to-rose-100" : index === routeArray.length - 1 ? "from-amber-50 to-amber-100" : "from-gray-50 to-gray-100"} rounded-xl p-5 shadow-md border ${index === 0 ? "border-rose-200" : index === routeArray.length - 1 ? "border-amber-200" : "border-gray-200"}`}
-                  >
-                    <h3 className="font-medium text-gray-800 text-lg">{stop}</h3>
-                    {index === 0 && (
-                      <p className="text-sm text-gray-600 mt-1 flex items-center">
-                        <MapPin className="h-4 w-4 mr-1 text-rose-500" />
-                        Starting Point
-                      </p>
-                    )}
-                    {index === routeArray.length - 1 && index !== 0 && (
-                      <p className="text-sm text-gray-600 mt-1 flex items-center">
-                        <MapPin className="h-4 w-4 mr-1 text-amber-500" />
-                        Final Destination
-                      </p>
-                    )}
-                    {index !== 0 && index !== routeArray.length - 1 && (
-                      <p className="text-sm text-gray-600 mt-1 flex items-center">
-                        <MapPin className="h-4 w-4 mr-1 text-gray-500" />
-                        Checkpoint
-                      </p>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
+                    <div
+                      className={`bg-gradient-to-r ${index === 0 ? "from-rose-50 to-rose-100" : index === routeArray.length - 1 ? "from-amber-50 to-amber-100" : "from-gray-50 to-gray-100"} rounded-xl p-5 shadow-md border ${index === 0 ? "border-rose-200" : index === routeArray.length - 1 ? "border-amber-200" : "border-gray-200"}`}
+                    >
+                      <h3 className="font-medium text-gray-800 text-lg">{stop}</h3>
+                      {index === 0 && (
+                        <p className="text-sm text-gray-600 mt-1 flex items-center">
+                          <MapPin className="h-4 w-4 mr-1 text-rose-500" />
+                          Starting Point
+                        </p>
+                      )}
+                      {index === routeArray.length - 1 && index !== 0 && (
+                        <p className="text-sm text-gray-600 mt-1 flex items-center">
+                          <MapPin className="h-4 w-4 mr-1 text-amber-500" />
+                          Final Destination
+                        </p>
+                      )}
+                      {index !== 0 && index !== routeArray.length - 1 && (
+                        <p className="text-sm text-gray-600 mt-1 flex items-center">
+                          <MapPin className="h-4 w-4 mr-1 text-gray-500" />
+                          Checkpoint
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="bg-gray-50 p-6 rounded-xl text-center">
+              <p className="text-gray-600">No route details available for this event.</p>
+            </div>
+          )}
 
           {/* Join Event CTA */}
           <div className="mt-12 bg-gradient-to-r from-rose-100 to-amber-100 rounded-xl p-6 text-center">
