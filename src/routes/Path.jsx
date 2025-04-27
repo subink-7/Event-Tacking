@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import Register from "../Authen/components/Register";
 import Signup from "../Auth/components/LoginForm";
 import EventsPage from "../Homepage/components/EventPage";
@@ -17,13 +17,44 @@ import NewsFeed from "../News/NewsFeed";
 import EventInfo from "../Homepage/EventInfo";
 import SuperadminDashbaord from "../Superadmin/SuperadminDashbaord";
 
+// Component to handle redirection for authenticated users
+const PublicRoute = ({ children }) => {
+  const isAuthenticated = localStorage.getItem("accessToken");
+  
+  if (isAuthenticated) {
+    // If user is logged in, redirect to dashboard
+    const userRole = localStorage.getItem("role");
+    if (userRole === "SUPERADMIN") {
+      return <Navigate to="/superadmin" replace />;
+    } else {
+      return <Navigate to="/dashboard" replace />;
+    }
+  }
+  
+  return children;
+};
+
 const Path = () => {
   return (
     <>
       <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<Register />} />
-        <Route path="/login" element={<Signup />} />
+        {/* Public Routes with authentication check */}
+        <Route 
+          path="/" 
+          element={
+            <PublicRoute>
+              <Register />
+            </PublicRoute>
+          } 
+        />
+        <Route 
+          path="/login" 
+          element={
+            <PublicRoute>
+              <Signup />
+            </PublicRoute>
+          } 
+        />
         
         {/* Protected Route for Dashboard */}
         <Route element={<ProtectedRoute />}>

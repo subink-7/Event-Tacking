@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
 import { FiMail, FiLock, FiEye, FiEyeOff } from "react-icons/fi"
@@ -14,6 +14,16 @@ export default function Signup() {
   const [isImageClicked, setIsImageClicked] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const navigate = useNavigate();
+
+  // Add effect to check if user is already logged in
+  useEffect(() => {
+    const accessToken = localStorage.getItem("accessToken");
+    if (accessToken) {
+      // If already authenticated, redirect to dashboard
+      // Using replace: true to prevent back navigation to login
+      navigate("/dashboard", { replace: true });
+    }
+  }, [navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -50,12 +60,17 @@ export default function Signup() {
           console.log("Storing token for user ID:", data.id);
 
           // Check user role and redirect accordingly
-
+          // Use replace: true to replace current history entry instead of adding a new one
           if (data.role === "ADMIN") {
-            navigate("/dashboard")
-            console.log("UserRole",data.role)
+            // Use replace to prevent the login page from being in history
+            navigate("/dashboard", { replace: true })
+            console.log("UserRole", data.role)
+          } else if (data.role === "SUPERADMIN") {
+            // Use replace to prevent the login page from being in history
+            navigate("/superadmin", { replace: true })
+            console.log("UserRole", data.role)
           } else {
-            navigate("/dashboard")
+            navigate("/dashboard", { replace: true })
           }
         } else {
           setError("Invalid response structure. No access token found.")
@@ -160,13 +175,7 @@ export default function Signup() {
             </motion.button>
           </form>
 
-          <p className="mt-8 text-sm text-gray-600">
-            Forgot your password?{" "}
-            <a href="#" className="text-[#6CB472] hover:underline">
-              Reset it here
-            </a>
-
-          </p>
+          
           <div className="mt-5">
           <a href="/" className="text-[#6CB472] ">
              <span className="text-red-500 mt-10">Don't have account?</span><span className="hover:underline">Register here</span> 

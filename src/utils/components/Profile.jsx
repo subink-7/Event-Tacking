@@ -279,7 +279,17 @@ export default function ProfilePage() {
                     </div>
                     <p className="text-gray-800 pl-7">{formData.phoneNumber}</p>
                   </div>
+                  <div>
+                  <p className="mt-8 text-sm text-gray-600">
+            Forgot your password?{" "}
+            <a href="#" className="text-[#6CB472] hover:underline">
+              Reset it here
+            </a>
+
+          </p>
+                    </div>
                 </div>
+                
               )}
             </div>
           )}
