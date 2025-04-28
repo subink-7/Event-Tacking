@@ -1,11 +1,12 @@
-"use client"
-
+              
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
 import { CalendarIcon, Clock, MapPin, FileText, Info, LogOut, Bell, MapPinOff, Globe } from "lucide-react"
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
 import { Header } from "../utils/components/Header"
+import { toast, ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 
 export default function AdminDashboard() {
   const [eventData, setEventData] = useState({
@@ -28,7 +29,6 @@ export default function AdminDashboard() {
   ])
   
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitStatus, setSubmitStatus] = useState({ type: null, message: null })
   const [error, setError] = useState("")
   const [eventImageUrl, setEventImageUrl] = useState("")
   const [userName, setUserName] = useState("")
@@ -89,6 +89,8 @@ export default function AdminDashboard() {
     setIsGeocodingStarting(true);
     setGeocodingError("");
     
+    const toastId = toast.loading(`Verifying location: ${locationName}...`);
+    
     try {
       const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationName)}&limit=1`);
       const data = await response.json();
@@ -134,14 +136,34 @@ export default function AdminDashboard() {
         
         setMapCenter([parsedLat, parsedLon]);
         setShowMap(true);
+        toast.update(toastId, { 
+          render: "Location verified successfully!", 
+          type: "success", 
+          isLoading: false, 
+          autoClose: 3000 
+        });
         return { lat: parsedLat, lon: parsedLon };
       } else {
-        setGeocodingError("Location not found. Please enter a valid location or set coordinates manually.");
+        const errorMsg = "Location not found. Please enter a valid location or set coordinates manually.";
+        setGeocodingError(errorMsg);
+        toast.update(toastId, { 
+          render: errorMsg, 
+          type: "error", 
+          isLoading: false, 
+          autoClose: 4000 
+        });
         return null;
       }
     } catch (error) {
       console.error("Geocoding error:", error);
-      setGeocodingError("Error while geocoding. Please try again or set coordinates manually.");
+      const errorMsg = "Error while geocoding. Please try again or set coordinates manually.";
+      setGeocodingError(errorMsg);
+      toast.update(toastId, { 
+        render: errorMsg, 
+        type: "error", 
+        isLoading: false, 
+        autoClose: 4000 
+      });
       return null;
     } finally {
       setIsGeocodingStarting(false);
@@ -171,8 +193,9 @@ export default function AdminDashboard() {
       }));
     }
     
-    if (submitStatus.message) {
-      setSubmitStatus({ type: null, message: null })
+    // Clear any errors when user makes changes
+    if (error) {
+      setError("");
     }
   };
 
@@ -228,6 +251,7 @@ export default function AdminDashboard() {
   // Add a new route point
   const addRoutePoint = () => {
     setRoutePoints([...routePoints, { name: "", lat: null, lng: null }]);
+    toast.info("New route point added", { icon: "🚩" });
   };
 
   // Remove a route point
@@ -236,6 +260,7 @@ export default function AdminDashboard() {
       const updatedPoints = [...routePoints];
       updatedPoints.splice(index, 1);
       setRoutePoints(updatedPoints);
+      toast.info("Route point removed", { icon: "🗑️" });
     }
   };
 
@@ -243,6 +268,7 @@ export default function AdminDashboard() {
   const verifyRoutePointLocation = async (index) => {
     const pointName = routePoints[index].name;
     if (!pointName) {
+      toast.error("Please enter a location name first");
       setGeocodingError("Please enter a location name first.");
       return;
     }
@@ -270,6 +296,10 @@ export default function AdminDashboard() {
           locationVerified: true
         }));
       }
+      
+      toast.info(`Updated coordinates for point #${activePointIndex + 1}`, {
+        autoClose: 2000
+      });
     } else {
       // Default - update the starting point
       setEventData(prev => ({
@@ -286,6 +316,10 @@ export default function AdminDashboard() {
         updatedPoints[0].lng = lng;
         setRoutePoints(updatedPoints);
       }
+      
+      toast.info("Updated starting point coordinates", {
+        autoClose: 2000
+      });
     }
   };
 
@@ -299,6 +333,7 @@ export default function AdminDashboard() {
 
   const handleVerifyLocation = async () => {
     if (!eventData.starting_point) {
+      toast.error("Please enter a starting point first");
       setGeocodingError("Please enter a starting point first.");
       return;
     }
@@ -311,6 +346,10 @@ export default function AdminDashboard() {
     const file = e.target.files[0]
     if (file) {
       setEventData({ ...eventData, image: file })
+      toast.info(`Image selected: ${file.name}`, {
+        icon: "🖼️",
+        autoClose: 2000
+      });
     }
   }
 
@@ -319,36 +358,43 @@ export default function AdminDashboard() {
 
     // Basic validation
     if (!eventData.title || !eventData.date || !eventData.time || !eventData.starting_point || !eventData.description) {
+      toast.error("Please fill in all required fields");
       setError("Please fill in all required fields.")
       return
     }
 
     if (!eventData.image) {
+      toast.error("Please upload an event image");
       setError("Please upload an event image.")
       return
     }
     
     // Validate coordinates
     if (!eventData.latitude || !eventData.longitude) {
+      toast.error("Please verify location to set coordinates for mapping");
       setError("Please verify location to set coordinates for mapping.")
       return
     }
     
     // Validate route points
     if (routePoints.length < 2) {
+      toast.error("Please add at least two route points (starting and ending points)");
       setError("Please add at least two route points (starting and ending points).")
       return
     }
     
     // Check if all route points have names
     if (routePoints.some(point => !point.name.trim())) {
+      toast.error("All route points must have names");
       setError("All route points must have names.")
       return
     }
 
     setError("")
     setIsSubmitting(true)
-    setSubmitStatus({ type: null, message: null })
+    
+    // Create a loading toast that will be updated
+    const toastId = toast.loading("Creating event, please wait...");
 
     const formData = new FormData()
     formData.append("title", eventData.title)
@@ -376,8 +422,13 @@ export default function AdminDashboard() {
         console.log("Event created successfully:", data)
         const eventId = data.id // Make sure we're getting the correct event ID
 
-        // After event is created, call the notification endpoint if notifications are enabled
+        // After event is created, update toast to show notification is being sent
         if (eventData.send_notifications) {
+          toast.update(toastId, { 
+            render: "Event created! Sending notifications to all users...", 
+            isLoading: true 
+          });
+          
           try {
             console.log("Sending notification to all users for event:", eventId);
             
@@ -397,24 +448,37 @@ export default function AdminDashboard() {
             if (!notificationResponse.ok) {
               const errorData = await notificationResponse.json();
               console.error("Notification error:", errorData);
-              setSubmitStatus({
-                type: 'warning',
-                message: 'Event created but notifications failed: ' + (errorData.error || "Unknown error"),
+              toast.update(toastId, { 
+                render: "Event created but notifications failed to send", 
+                type: "warning", 
+                isLoading: false, 
+                autoClose: 5000 
+              });
+            } else {
+              toast.update(toastId, { 
+                render: "Event created and notifications sent successfully!", 
+                type: "success", 
+                isLoading: false, 
+                autoClose: 5000 
               });
             }
           } catch (notificationError) {
             console.error("Notification failed:", notificationError);
-            setSubmitStatus({
-              type: 'warning',
-              message: 'Event created but notifications failed to send',
+            toast.update(toastId, { 
+              render: "Event created but notifications failed to send", 
+              type: "warning", 
+              isLoading: false, 
+              autoClose: 5000 
             });
           }
+        } else {
+          toast.update(toastId, { 
+            render: "Event created successfully!", 
+            type: "success", 
+            isLoading: false, 
+            autoClose: 5000 
+          });
         }
-    
-        setSubmitStatus({
-          type: 'success',
-          message: 'Event created successfully!' + (eventData.send_notifications ? ' Notifications sent to all users.' : ''),
-        })
 
         // Clear form
         setEventData({
@@ -438,11 +502,24 @@ export default function AdminDashboard() {
         setShowMap(false)
       } else {
         const errorData = await eventResponse.json()
-        setError(errorData.error_message || "Error creating event. Please try again.")
+        const errorMessage = errorData.error_message || "Error creating event. Please try again.";
+        setError(errorMessage)
+        toast.update(toastId, { 
+          render: errorMessage, 
+          type: "error", 
+          isLoading: false, 
+          autoClose: 5000 
+        });
       }
     } catch (err) {
       setError("An error occurred. Please try again later.")
       console.error(err)
+      toast.update(toastId, { 
+        render: "Network error. Please try again later.", 
+        type: "error", 
+        isLoading: false, 
+        autoClose: 5000 
+      });
     } finally {
       setIsSubmitting(false)
     }
@@ -463,15 +540,15 @@ export default function AdminDashboard() {
       locationVerified: false,
     })
     setRoutePoints([{ name: "", lat: null, lng: null }]);
-    setSubmitStatus({ type: null, message: null })
+    setError("")
     setShowMap(false)
+    toast.info("Form cleared", { autoClose: 2000 })
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-rose-50 to-white font-sans">
-            <div className="sticky top-0 z-50 w-full bg-white/90 backdrop-blur-sm shadow-sm">
-              <Header/>
-        
+      <div className="sticky top-0 z-50 w-full bg-white/90 backdrop-blur-sm shadow-sm">
+        <Header/>
       </div>
 
       <motion.div
@@ -486,21 +563,11 @@ export default function AdminDashboard() {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6">
-          {/* Status Message */}
-          {submitStatus.message && (
-            <div className={`p-3 mb-6 rounded-md ${
-              submitStatus.type === 'success' 
-                ? 'bg-green-50 text-green-700 border border-green-200' 
-                : 'bg-red-50 text-red-700 border border-red-200'
-            }`}>
-              {submitStatus.message}
-            </div>
-          )}
           {error && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-red-500 text-center bg-red-50 p-4 rounded-lg border border-red-100 shadow-sm"
+              className="text-red-500 text-center bg-red-50 p-4 rounded-lg border border-red-100 shadow-sm mb-6"
             >
               <p className="font-medium">{error}</p>
             </motion.div>
@@ -826,16 +893,25 @@ export default function AdminDashboard() {
               <button
                 type="button"
                 onClick={clearForm}
-                className="bg-gray-100 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-200"
+                className="bg-gray-100 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-200 flex items-center justify-center gap-2"
               >
-                Clear Form
+                <span>Clear Form</span>
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="bg-blue-600 text-white py-2 px-4 rounded-md disabled:opacity-50 hover:bg-blue-700"
+                className="bg-blue-600 text-white py-2 px-4 rounded-md disabled:opacity-70 hover:bg-blue-700 flex items-center justify-center gap-2"
               >
-                {isSubmitting ? "Creating Event..." : "Create Event"}
+                {isSubmitting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Create Event</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -849,6 +925,20 @@ export default function AdminDashboard() {
           </div>
         )}
       </motion.div>
+      
+      {/* Toast container - positioned in the top right corner */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        limit={3}
+      />
     </div>
   )
 }

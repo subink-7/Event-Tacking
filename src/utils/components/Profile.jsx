@@ -1,19 +1,88 @@
 import React, { useState, useEffect } from 'react';
 import { Header } from './Header';
 import { Footer } from './Footer';
+import { toast } from 'react-toastify';
 
 export default function ProfilePage() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phoneNumber: '',
+    address: '',
   });
   
   const [editMode, setEditMode] = useState(false);
   const [userId, setUserId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [updateSuccess, setUpdateSuccess] = useState(false);
+
+  // Function to refresh the access token
+  const refreshAccessToken = async () => {
+    try {
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (!refreshToken) {
+        throw new Error('No refresh token available');
+      }
+
+      const response = await fetch('http://localhost:8000/api/token/refresh/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          refresh: refreshToken
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to refresh token');
+      }
+
+      const data = await response.json();
+      localStorage.setItem('accessToken', data.access);
+      return data.access;
+    } catch (err) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('userid');
+      toast.error('Session expired. Please log in again.', {
+        onClick: handleLogout
+      });
+      return null;
+    }
+  };
+
+  // API request with token refresh capability
+  const apiRequestWithTokenRefresh = async (url, options = {}) => {
+    // First attempt with current access token
+    const accessToken = localStorage.getItem('accessToken');
+    if (accessToken) {
+      options.headers = {
+        ...options.headers,
+        'Authorization': `Bearer ${accessToken}`
+      };
+    }
+
+    let response = await fetch(url, options);
+    
+    // If token expired, try to refresh and retry the request
+    if (response.status === 401) {
+      const tokenData = await response.json();
+      if (tokenData.code === 'token_not_valid') {
+        const newToken = await refreshAccessToken();
+        if (newToken) {
+          // Retry request with new token
+          options.headers = {
+            ...options.headers,
+            'Authorization': `Bearer ${newToken}`
+          };
+          return fetch(url, options);
+        }
+      }
+    }
+    
+    return response;
+  };
 
   // Fetch user ID from localStorage
   useEffect(() => {
@@ -22,6 +91,9 @@ export default function ProfilePage() {
       setUserId(Number(storedUserId));
     } else {
       setError('User ID not found. Please log in.');
+      toast.error('User ID not found. Please log in.', {
+        onClick: handleLogout
+      });
       setLoading(false);
     }
   }, []);
@@ -32,7 +104,7 @@ export default function ProfilePage() {
       if (!userId) return;
 
       try {
-        const response = await fetch(`http://localhost:8000/users/api/customuser/${userId}/`);
+        const response = await apiRequestWithTokenRefresh(`http://localhost:8000/users/api/customuser/${userId}/`);
         if (!response.ok) {
           throw new Error('Failed to fetch user data');
         }
@@ -42,10 +114,12 @@ export default function ProfilePage() {
         setFormData({
           name: data.name ?? 'N/A',
           email: data.email ?? 'N/A',
-          phoneNumber: data.phonenumber ?? 'N/A',
+          phoneNumber: data.phonenumber ?? 'N/A', 
+          address: data.address ?? 'N/A',
         });
       } catch (err) {
         setError(err.message);
+        toast.error(`Error: ${err.message}`);
       } finally {
         setLoading(false);
       }
@@ -68,62 +142,76 @@ export default function ProfilePage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setUpdateSuccess(false);
 
     try {
-      const response = await fetch('http://localhost:8000/users/api/update-profile/', {
+      const response = await apiRequestWithTokenRefresh('http://localhost:8000/users/api/update-profile/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-
         },
         body: JSON.stringify({
-          userId: userId,
-          ...formData
+          name: formData.name,
+          email: formData.email,
+          phonenumber: formData.phoneNumber,
+          address: formData.address,
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to update profile');
+      if (response.ok) {
+        // Refetch the user data after update
+        const userResponse = await apiRequestWithTokenRefresh(`http://localhost:8000/users/api/customuser/${userId}/`);
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          setFormData({
+            name: userData.name ?? 'N/A',
+            email: userData.email ?? 'N/A',
+            phoneNumber: userData.phonenumber ?? 'N/A',
+            address: userData.address ?? 'N/A',
+          });
+        }
+        
+        // Show success toast
+        toast.success('Profile updated successfully!', {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true
+        });
+        
+        setEditMode(false);
+      } else {
+        const errorData = await response.json();
+        const errorMessage = errorData.message || 'Failed to update profile.';
+        setError(errorMessage);
+        toast.error(`Error: ${errorMessage}`);
       }
-
-      setUpdateSuccess(true);
-      setEditMode(false);
     } catch (err) {
       setError(err.message);
+      toast.error(`Error: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
 
+  // Handle logout when session cannot be refreshed
+  const handleLogout = () => {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('userid');
+    window.location.href = '/login';
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-gray-100 font-sans">
-      {/* Enhanced header with shadow and blur */}
+      {/* Header */}
       <div className="sticky top-0 z-10 w-full bg-white/90 backdrop-blur-md shadow-md">
         <Header />
       </div>
 
       <main className="max-w-4xl mx-auto p-6 md:p-8">
-        {/* Notification for success or error */}
-        {updateSuccess && (
-          <div className="mb-6 bg-green-100 border-l-4 border-green-500 p-4 rounded-md text-green-700 flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            Profile updated successfully!
-          </div>
-        )}
-        
-        {error && (
-          <div className="mb-6 bg-red-100 border-l-4 border-red-500 p-4 rounded-md text-red-700 flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            {error}
-          </div>
-        )}
-
+        {/* Profile Card */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200 transition-all hover:shadow-xl">
           <div className="border-b border-gray-100 p-6 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
             <h2 className="text-2xl font-bold">My Profile</h2>
@@ -137,26 +225,14 @@ export default function ProfilePage() {
             </div>
           ) : (
             <div className="p-6">
-              {/* Profile picture with improved icon */}
+              {/* Profile Avatar */}
               <div className="flex justify-center mb-8">
                 <div className="relative group">
-                  <div className="w-32 h-32 rounded-full bg-gradient-to-r from-blue-100 to-indigo-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-20 h-20 text-blue-600">
-                      <path d="M18.685 19.097A9.723 9.723 0 0021.75 12c0-5.385-4.365-9.75-9.75-9.75S2.25 6.615 2.25 12a9.723 9.723 0 003.065 7.097A9.716 9.716 0 0012 21.75a9.716 9.716 0 006.685-2.653z" />
-                      <path d="M12 12.75c-1.648 0-3-1.352-3-3V8.25h6v1.5c0 1.648-1.352 3-3 3z" />
-                      <path d="M16.5 6.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
-                    </svg>
-                  </div>
-                  {editMode && (
-                    <button className="absolute bottom-0 right-0 bg-blue-500 text-white p-2 rounded-full shadow-lg hover:bg-blue-600 transition-colors">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A2 2 0 0011.172 3H8.828a2 2 0 00-1.414.586L6.293 4.707A1 1 0 015.586 5H4zm6 9a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                  )}
+                
                 </div>
               </div>
 
+              {/* Profile Info */}
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-semibold text-gray-700">Personal Information</h3>
                 {!editMode && (
@@ -174,52 +250,98 @@ export default function ProfilePage() {
 
               {editMode ? (
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="transition-all duration-200 hover:shadow-md rounded-lg">
+                  {/* Name */}
+                  <div>
                     <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1 ml-1">Name</label>
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                      required
-                    />
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <input
+                        type="text"
+                        id="name"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleChange}
+                        className="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        required
+                      />
+                    </div>
                   </div>
-                  
-                  <div className="transition-all duration-200 hover:shadow-md rounded-lg">
+
+                  {/* Email */}
+                  <div>
                     <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1 ml-1">Email</label>
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                      required
-                    />
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                          <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                        </svg>
+                      </div>
+                      <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        className="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        required
+                      />
+                    </div>
                   </div>
-                  
-                  <div className="transition-all duration-200 hover:shadow-md rounded-lg">
+
+                  {/* Phone Number */}
+                  <div>
                     <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1 ml-1">Phone Number</label>
-                    <input
-                      type="tel"
-                      id="phoneNumber"
-                      name="phoneNumber"
-                      value={formData.phoneNumber}
-                      onChange={handleChange}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                    />
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                        </svg>
+                      </div>
+                      <input
+                        type="tel"
+                        id="phoneNumber"
+                        name="phoneNumber"
+                        value={formData.phoneNumber}
+                        onChange={handleChange}
+                        className="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                      />
+                    </div>
                   </div>
                   
+                  {/* Address */}
+                  <div>
+                    <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1 ml-1">Address</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 pt-3 pointer-events-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <textarea
+                        id="address"
+                        name="address"
+                        value={formData.address}
+                        onChange={handleChange}
+                        className="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        rows="3"
+                      ></textarea>
+                    </div>
+                  </div>
+
+                  {/* Buttons */}
                   <div className="flex justify-end space-x-3 pt-6">
                     <button
                       type="button"
                       onClick={() => setEditMode(false)}
                       className="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center shadow"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                       </svg>
                       Cancel
                     </button>
@@ -229,17 +351,17 @@ export default function ProfilePage() {
                       disabled={loading}
                     >
                       {loading ? (
-                        <span className="flex items-center">
-                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <>
+                          <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
                           Updating...
-                        </span>
+                        </>
                       ) : (
                         <>
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                           </svg>
                           Save Changes
                         </>
@@ -249,59 +371,72 @@ export default function ProfilePage() {
                 </form>
               ) : (
                 <div className="space-y-6">
+                  {/* View Mode Fields with Icons */}
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:shadow-md transition-all duration-200">
-                    <div className="flex items-center mb-1">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                      </svg>
-                      <h3 className="text-sm font-semibold text-gray-600">Name</h3>
+                    <div className="flex items-center">
+                      <div className="bg-blue-100 p-2 rounded-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="ml-4">
+                        <h3 className="text-sm font-semibold text-gray-600">Name</h3>
+                        <p className="text-gray-800">{formData.name}</p>
+                      </div>
                     </div>
-                    <p className="text-gray-800 pl-7">{formData.name}</p>
                   </div>
                   
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:shadow-md transition-all duration-200">
-                    <div className="flex items-center mb-1">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-                        <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
-                      </svg>
-                      <h3 className="text-sm font-semibold text-gray-600">Email</h3>
+                    <div className="flex items-center">
+                      <div className="bg-blue-100 p-2 rounded-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                          <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                        </svg>
+                      </div>
+                      <div className="ml-4">
+                        <h3 className="text-sm font-semibold text-gray-600">Email</h3>
+                        <p className="text-gray-800">{formData.email}</p>
+                      </div>
                     </div>
-                    <p className="text-gray-800 pl-7">{formData.email}</p>
                   </div>
                   
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:shadow-md transition-all duration-200">
-                    <div className="flex items-center mb-1">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-                      </svg>
-                      <h3 className="text-sm font-semibold text-gray-600">Phone Number</h3>
+                    <div className="flex items-center">
+                      <div className="bg-blue-100 p-2 rounded-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                        </svg>
+                      </div>
+                      <div className="ml-4">
+                        <h3 className="text-sm font-semibold text-gray-600">Phone Number</h3>
+                        <p className="text-gray-800">{formData.phoneNumber}</p>
+                      </div>
                     </div>
-                    <p className="text-gray-800 pl-7">{formData.phoneNumber}</p>
                   </div>
-                  <div>
-                  <p className="mt-8 text-sm text-gray-600">
-            Forgot your password?{" "}
-            <a href="#" className="text-[#6CB472] hover:underline">
-              Reset it here
-            </a>
-
-          </p>
+                  
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:shadow-md transition-all duration-200">
+                    <div className="flex items-center">
+                      <div className="bg-blue-100 p-2 rounded-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="ml-4">
+                        <h3 className="text-sm font-semibold text-gray-600">Address</h3>
+                        <p className="text-gray-800">{formData.address}</p>
+                      </div>
                     </div>
+                  </div>
                 </div>
-                
               )}
             </div>
           )}
         </div>
-        
-       
       </main>
 
       {/* Footer */}
-      <div className="relative z-10 mt-auto">
-             <Footer/>
-           </div>
+      <Footer />
     </div>
   );
 }
