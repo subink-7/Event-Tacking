@@ -5,19 +5,18 @@ import { useNavigate } from "react-router-dom";
 const CalendarCard = ({ event }) => {
   const navigate = useNavigate();
   
-  // Format image URL properly
+
   const imageUrl = event?.image && !event.image.startsWith("http")
     ? `http://127.0.0.1:8000/${event.image}`
     : event?.image || "/placeholder.svg";
   
-  // Parse route if it exists
   const displayRoute = event?.route 
     ? Array.isArray(event.route) 
       ? event.route.join(" → ") 
       : event.route
     : null;
 
-  // Handle navigation to event details page
+ 
   const handleViewDetails = () => {
     navigate(`/event/${event.id}`, {
       state: { eventData: event }

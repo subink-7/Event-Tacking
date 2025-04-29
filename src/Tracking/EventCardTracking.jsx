@@ -2,19 +2,19 @@ import { Calendar } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 
-const BASE_URL = "http://127.0.0.1:8000/"; // Change this to your backend URL
+const BASE_URL = "http://127.0.0.1:8000/"; 
 
 
 
 function EventcardTracking({ id, title, date, time, starting_point, route, description, image }) {
-  // Correct the image URL construction
+ 
   const imageUrl = image && !image.startsWith("http") ? `${BASE_URL}${image}` : image || "/placeholder.svg"; // Check if it's already a full URL
   const navigate = useNavigate();
   const goToEventTracking = () => navigate("/calendar");
 
   return (
     <div className="group relative overflow-hidden rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 h-[400px]">
-      {/* Card background image */}
+   
       <div className="absolute inset-0">
         <img
           src={imageUrl}

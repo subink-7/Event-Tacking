@@ -7,6 +7,8 @@ import {
   FaTimes 
 } from 'react-icons/fa';
 import axios from 'axios';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const UsersPanel = ({ users, setUsers, loading, error }) => {
   const [editingItem, setEditingItem] = useState(null);
@@ -22,7 +24,7 @@ const UsersPanel = ({ users, setUsers, loading, error }) => {
     });
   };
 
-  // Handle form submission for creating or editing
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -38,24 +40,69 @@ const UsersPanel = ({ users, setUsers, loading, error }) => {
         ? users.map(user => user.id === editingItem.id ? response.data : user)
         : [...users, response.data]);
   
-      // Reset form
+      // Show success toast
+      toast.success(`User ${editingItem ? 'updated' : 'created'} successfully!`);
+      
+   
       setEditingItem(null);
       setIsCreating(false);
       setFormData({});
     } catch (err) {
       console.error("Error submitting form:", err);
+      toast.error(`Failed to ${editingItem ? 'update' : 'create'} user: ${err.message}`);
     }
   };
 
-  // Handle delete
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this user?')) return;
+
+  const handleDelete = (id) => {
+    const userToDelete = users.find(user => user.id === id);
+    if (!userToDelete) return;
     
+   
+    const toastId = `confirm-delete-${id}`;
+    
+    toast.info(
+      <div>
+        <p className="mb-2">Are you sure you want to delete user: <strong>{userToDelete.email}</strong>?</p>
+        <div className="flex justify-end space-x-2">
+          <button
+            className="px-3 py-1 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+            onClick={() => toast.dismiss(toastId)}
+          >
+            Cancel
+          </button>
+          <button
+            className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+            onClick={() => confirmDelete(id, toastId)}
+          >
+            Delete
+          </button>
+        </div>
+      </div>,
+      {
+        toastId,
+        autoClose: false,
+        closeOnClick: false,
+        closeButton: false
+      }
+    );
+  };
+
+
+  const confirmDelete = async (id, toastId) => {
     try {
       await axios.delete(`http://localhost:8000/users/api/customuser/${id}/`);
       setUsers(users.filter(user => user.id !== id));
+      
+      // Dismiss the confirmation toast
+      toast.dismiss(toastId);
+      
+      // Show success toast for deletion
+      toast.success('User deleted successfully!');
     } catch (err) {
       console.error("Error deleting user:", err);
+      toast.dismiss(toastId);
+      toast.error(`Failed to delete user: ${err.message}`);
     }
   };
 
@@ -213,6 +260,20 @@ const UsersPanel = ({ users, setUsers, loading, error }) => {
 
   return (
     <div>
+      {/* Toast Container */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        limit={3}
+      />
+      
       {error && (
         <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-6">
           {error}

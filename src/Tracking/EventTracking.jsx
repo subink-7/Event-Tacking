@@ -45,15 +45,15 @@ const EventTracking = () => {
     ? getDaysInMonth(currentYear - 1, 11) 
     : getDaysInMonth(currentYear, currentMonthIndex - 1);
   
-  // Previous month days that appear in current month view
+ 
   const prevMonthDays = Array.from({ length: firstDayOfMonth }, (_, i) => 
     daysInPrevMonth - firstDayOfMonth + i + 1
   );
   
-  // Current month days
+ 
   const currentMonthDays = Array.from({ length: daysInCurrentMonth }, (_, i) => i + 1);
   
-  // Next month days to complete the calendar grid
+  
   const nextMonthDays = Array.from(
     { length: 42 - (prevMonthDays.length + currentMonthDays.length) }, 
     (_, i) => i + 1
@@ -85,7 +85,7 @@ const EventTracking = () => {
     setSelectedDay(null);
   };
 
-  // Get events for the current month
+
   const getMonthEvents = () => {
     return events.filter(event => {
       const eventDate = new Date(event.date);
@@ -95,7 +95,7 @@ const EventTracking = () => {
     });
   };
 
-  // Check if a day has an event
+
   const hasEvent = (day, isCurrentMonth) => {
     if (!isCurrentMonth) return false;
     
@@ -107,7 +107,7 @@ const EventTracking = () => {
     });
   };
 
-  // Get events for a specific day
+  
   const getEventsForDay = (day, isCurrentMonth) => {
     if (!isCurrentMonth) return [];
     
@@ -122,7 +122,7 @@ const EventTracking = () => {
   // Handle day selection
   const handleDayClick = (day, isCurrentMonth) => {
     if (!isCurrentMonth) {
-      // If clicking on a day from prev/next month, navigate to that month
+     
       if (day > 20) {
         navigateMonth(-1);
       } else {
@@ -138,7 +138,7 @@ const EventTracking = () => {
     }
   };
 
-  // Function to determine day styling based on events and selection
+
   const getDayClass = (day, isCurrentMonth = true) => {
     let classes = "relative h-12 flex items-center justify-center border rounded-lg ";
     
@@ -164,7 +164,7 @@ const EventTracking = () => {
     return classes + "transition-colors duration-200 cursor-pointer";
   };
 
-  // Get title for events section based on selection
+ 
   const getEventsSectionTitle = () => {
     if (selectedDay) {
       return `Events on ${new Date(currentYear, currentMonthIndex, selectedDay).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;

@@ -16,7 +16,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Function to refresh the access token
+  
   const refreshAccessToken = async () => {
     try {
       const refreshToken = localStorage.getItem('refreshToken');
@@ -52,9 +52,9 @@ export default function ProfilePage() {
     }
   };
 
-  // API request with token refresh capability
+ 
   const apiRequestWithTokenRefresh = async (url, options = {}) => {
-    // First attempt with current access token
+    
     const accessToken = localStorage.getItem('accessToken');
     if (accessToken) {
       options.headers = {
@@ -65,13 +65,13 @@ export default function ProfilePage() {
 
     let response = await fetch(url, options);
     
-    // If token expired, try to refresh and retry the request
+   
     if (response.status === 401) {
       const tokenData = await response.json();
       if (tokenData.code === 'token_not_valid') {
         const newToken = await refreshAccessToken();
         if (newToken) {
-          // Retry request with new token
+         
           options.headers = {
             ...options.headers,
             'Authorization': `Bearer ${newToken}`
@@ -110,7 +110,7 @@ export default function ProfilePage() {
         }
         const data = await response.json();
 
-        // Update form data with API response
+        
         setFormData({
           name: data.name ?? 'N/A',
           email: data.email ?? 'N/A',
@@ -158,7 +158,7 @@ export default function ProfilePage() {
       });
 
       if (response.ok) {
-        // Refetch the user data after update
+     
         const userResponse = await apiRequestWithTokenRefresh(`http://localhost:8000/users/api/customuser/${userId}/`);
         if (userResponse.ok) {
           const userData = await userResponse.json();
@@ -195,7 +195,7 @@ export default function ProfilePage() {
     }
   };
 
-  // Handle logout when session cannot be refreshed
+  
   const handleLogout = () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');

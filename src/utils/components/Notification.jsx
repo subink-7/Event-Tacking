@@ -10,7 +10,7 @@ export default function Notification() {
   
   
 
-  // Helper to determine icon based on event type
+ 
   const getIconByType = (type) => {
     switch (type) {
       case 'cultural':
@@ -26,7 +26,7 @@ export default function Notification() {
     }
   };
 
-  // Helper to determine background color based on event type
+  
   const getBackgroundByType = (type) => {    
     switch (type) {
       case 'cultural':
@@ -42,12 +42,12 @@ export default function Notification() {
     }
   };
 
-  // Update the removeNotification function to use Redux
+ 
   const handleRemoveNotification = (id) => {
     dispatch(removeNotification(id));
   };
 
-  // Update the clearAll function to use Redux
+  
   const clearAll = () => {
     dispatch(clearAllNotifications());
   };

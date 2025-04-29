@@ -14,20 +14,18 @@ export function Header() {
   const [userRole, setUserRole] = React.useState("");
   const navigate = useNavigate();
   
-  // Check for both access and refresh tokens on component mount and updates
+ 
   React.useEffect(() => {
     const checkAuthStatus = () => {
       const accessToken = localStorage.getItem("accessToken");
       const refreshToken = localStorage.getItem("refreshToken");
       
-      // Consider user logged in if either token exists
+     
       setIsLoggedIn(!!(accessToken || refreshToken));
       
-      // If refresh token exists but access token doesn't, you might want to
-      // trigger a token refresh here (calling your refresh API endpoint)
+  
       if (!accessToken && refreshToken) {
-        // Optional: Implement token refresh logic here
-        // refreshAccessToken(refreshToken);
+        
       }
       
       // Set user name and role
@@ -45,7 +43,7 @@ export function Header() {
     
     checkAuthStatus();
     
-    // Add event listener for storage changes (in case tokens are updated in another tab)
+   
     window.addEventListener('storage', checkAuthStatus);
     
     return () => {

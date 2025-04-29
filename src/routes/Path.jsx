@@ -12,12 +12,12 @@ import Notification from "../utils/components/Notification";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import AllEvents from "../utils/components/AllEvents";
-import Eventcard from "../Homepage/components/Eventcard";
+
 import NewsFeed from "../News/NewsFeed";
 import EventInfo from "../Homepage/EventInfo";
 import SuperadminDashbaord from "../Superadmin/SuperadminDashbaord";
 
-// Component to handle redirection for authenticated users
+
 const PublicRoute = ({ children }) => {
   const isAuthenticated = localStorage.getItem("accessToken");
   
@@ -38,7 +38,7 @@ const Path = () => {
   return (
     <>
       <Routes>
-        {/* Public Routes with authentication check */}
+
         <Route 
           path="/" 
           element={
@@ -56,7 +56,7 @@ const Path = () => {
           } 
         />
         
-        {/* Protected Route for Dashboard */}
+   
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<EventsPage />} />
           <Route path="/admindashboard" element={<AdminDashboard />} />
@@ -68,14 +68,14 @@ const Path = () => {
           <Route path="/newsfeed" element={<NewsFeed/>}/>
           <Route path="/superadmin" element={<SuperadminDashbaord/>}/>
           
-          {/* Modified route: Change from static to dynamic with ID parameter */}
+         
           <Route path="/event/:id" element={<EventInfo/>}/>
           
-          {/* Keep the old route for backward compatibility if needed */}
+         
           <Route path="/eventinfo" element={<EventInfo/>}/>
         </Route>
       </Routes>
-      <ToastContainer /> {/* Make sure ToastContainer is outside of Routes */}
+      <ToastContainer /> 
     </>
   );
 };

@@ -50,7 +50,7 @@ export default function Register() {
         const data = await response.json()
         console.log("API Response:", data)
 
-        // Redirect to login page after successful registration
+       
         navigate("/login")
       } else {
         const errorData = await response.json()
@@ -74,7 +74,7 @@ export default function Register() {
         transition={{ duration: 0.5 }}
         className="w-11/12 max-w-5xl h-4/5 bg-white flex items-stretch justify-between rounded-3xl shadow-2xl overflow-hidden"
       >
-        {/* Left side image - enhanced with overlay text */}
+      
         <motion.div
           className={`w-1/2 bg-cover bg-center relative cursor-pointer flex items-center justify-center transition-all duration-500 ease-in-out ${isImageClicked ? "scale-105" : ""}`}
           style={{
@@ -93,7 +93,7 @@ export default function Register() {
           </div>
         </motion.div>
 
-        {/* Right side form - improved typography and spacing */}
+     
         <motion.div
           className="w-1/2 flex flex-col justify-center items-center p-12 bg-white"
           onClick={handleTextClick}
@@ -120,7 +120,7 @@ export default function Register() {
               </motion.div>
             )}
 
-            {/* Full Name input - improved styling */}
+           
             <div className="relative group">
               <FiUser className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-400 group-focus-within:text-[#6CB472] transition-colors duration-200" />
               <input
@@ -132,7 +132,7 @@ export default function Register() {
               />
             </div>
 
-            {/* Email input - improved styling */}
+        
             <div className="relative group">
               <FiMail className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-400 group-focus-within:text-[#6CB472] transition-colors duration-200" />
               <input
@@ -144,7 +144,7 @@ export default function Register() {
               />
             </div>
 
-            {/* Password input - improved styling */}
+           
             <div className="relative group">
               <FiLock className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-400 group-focus-within:text-[#6CB472] transition-colors duration-200" />
               <input
@@ -163,7 +163,7 @@ export default function Register() {
               </button>
             </div>
 
-            {/* Confirm Password input - improved styling */}
+           
             <div className="relative group">
               <FiLock className="absolute top-1/2 left-3 transform -translate-y-1/2 text-gray-400 group-focus-within:text-[#6CB472] transition-colors duration-200" />
               <input
@@ -182,7 +182,7 @@ export default function Register() {
               </button>
             </div>
 
-            {/* Submit button - enhanced styling */}
+       
             <motion.button
               type="submit"
               whileHover={{ scale: 1.03 }}

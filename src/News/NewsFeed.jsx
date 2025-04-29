@@ -24,19 +24,18 @@ export default function NewsFeed() {
   const [activeCommentPost, setActiveCommentPost] = useState(null)
   const [showLikersTooltip, setShowLikersTooltip] = useState(null)
   const [likersList, setLikersList] = useState({})
-  
-  // Pagination state variables
+
   const [currentPage, setCurrentPage] = useState(1)
   const [hasMorePosts, setHasMorePosts] = useState(true)
   const [postsPerPage] = useState(5)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [allPosts, setAllPosts] = useState([])
   
-  // Ref for infinite scroll
+
   const observerRef = useRef(null)
   const lastPostRef = useRef(null)
 
-  // Base URL for API and assets
+  
   const BASE_URL = "http://localhost:8000/"
 
   // Get JWT token from localStorage
@@ -87,10 +86,10 @@ export default function NewsFeed() {
       })
 
       if (response.status === 401) {
-        // Try to refresh token
+        
         const refreshed = await refreshToken()
         if (refreshed) {
-          return fetchWithAuth(url, options) // Retry with new token
+          return fetchWithAuth(url, options) 
         }
         throw new Error("Session expired. Please login again.")
       }
@@ -106,7 +105,7 @@ export default function NewsFeed() {
     }
   }
 
-  // Get user name from localStorage on component mount
+
   useEffect(() => {
     const storedName = localStorage.getItem("name")
     if (storedName) {
@@ -114,7 +113,7 @@ export default function NewsFeed() {
     }
   }, [])
 
-  // Setup intersection observer for infinite scrolling
+ 
   useEffect(() => {
     if (!hasMorePosts) return;
 
@@ -140,7 +139,7 @@ export default function NewsFeed() {
     };
   }, [posts, isLoadingMore, hasMorePosts]);
 
-  // Fetch posts and events on component mount
+  
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -158,7 +157,7 @@ export default function NewsFeed() {
 
         setAllPosts(postsData)
         
-        // Initial pagination
+      
         const initialPosts = postsData.slice(0, postsPerPage)
         setPosts(initialPosts)
         setHasMorePosts(postsData.length > postsPerPage)
@@ -175,7 +174,7 @@ export default function NewsFeed() {
     fetchData()
   }, [])
 
-  // Load more posts for pagination
+
   const loadMorePosts = () => {
     if (!hasMorePosts || isLoadingMore) return;
     
@@ -197,7 +196,7 @@ export default function NewsFeed() {
     setIsLoadingMore(false);
   };
 
-  // Handle image upload
+ 
   const handleImageChange = (e) => {
     const file = e.target.files[0]
     if (file) {
@@ -208,7 +207,7 @@ export default function NewsFeed() {
     }
   }
 
-  // Handle post submission
+  
   const handleSubmit = async (e) => {
     e.preventDefault()
 
@@ -237,7 +236,7 @@ export default function NewsFeed() {
 
       const newPost = await response.json()
       
-      // Update both allPosts and the paginated posts
+    
       setAllPosts(prevPosts => [newPost, ...prevPosts])
       setPosts(prevPosts => [newPost, ...prevPosts])
       
@@ -251,34 +250,33 @@ export default function NewsFeed() {
     }
   }
 
-  // Function to fetch likes details for a post
-  // Function to fetch likes details for a post
+
 const fetchLikesDetails = async (postId) => {
   if (likersList[postId]) {
-    return likersList[postId] // Use cached data if available
+    return likersList[postId] 
   }
   
   try {
     const response = await fetchWithAuth(`${BASE_URL}posts/feedback/${postId}/likes/`)
     const likesData = await response.json()
     
-    // Process the likes data to ensure it has the correct format
+  
     const processedLikes = likesData.map(like => {
-      // If the like contains user_detail, return that
+     
       if (like.user_detail) {
         return like.user_detail
       }
-      // Otherwise create a placeholder user object with the available data
+   
       return {
         id: like.user,
         username: null,
         first_name: null,
         last_name: null,
-        email: `User ${like.user}` // Fallback display name
+        email: `User ${like.user}` 
       }
     })
     
-    // Cache the processed likes data
+    
     setLikersList(prev => ({
       ...prev,
       [postId]: processedLikes
@@ -291,7 +289,7 @@ const fetchLikesDetails = async (postId) => {
   }
 }
 
-  // Function to handle liking a post
+
 const handleLike = async (postId) => {
   try {
     const response = await fetchWithAuth(
@@ -304,7 +302,7 @@ const handleLike = async (postId) => {
       }
     )
 
-    // Update both allPosts and the paginated posts using a consistent function
+ 
     const updatePostsInArray = (postsArray) => {
       return postsArray.map(post => {
         if (post.id === postId) {
@@ -321,7 +319,7 @@ const handleLike = async (postId) => {
     setAllPosts(prevPosts => updatePostsInArray(prevPosts))
     setPosts(prevPosts => updatePostsInArray(prevPosts))
     
-    // Clear cached likers list to fetch updated data next time
+
     setLikersList(prev => {
       const newList = {...prev}
       delete newList[postId]
@@ -333,7 +331,7 @@ const handleLike = async (postId) => {
   }
 }
 
-// Similarly, update the handleUnlike function too
+
 const handleUnlike = async (postId) => {
   try {
     await fetchWithAuth(
@@ -343,7 +341,7 @@ const handleUnlike = async (postId) => {
       }
     )
 
-    // Update both allPosts and the paginated posts
+    
     const updatePostsInArray = (postsArray) => {
       return postsArray.map(post => {
         if (post.id === postId) {
@@ -360,7 +358,7 @@ const handleUnlike = async (postId) => {
     setAllPosts(prevPosts => updatePostsInArray(prevPosts))
     setPosts(prevPosts => updatePostsInArray(prevPosts))
     
-    // Clear cached likers list to fetch updated data next time
+
     setLikersList(prev => {
       const newList = {...prev}
       delete newList[postId]
@@ -372,7 +370,7 @@ const handleUnlike = async (postId) => {
   }
 }
 
-  // Function to handle clicking on a post to like/unlike (Instagram style)
+ 
   const handlePostClick = (postId, isLiked) => {
     if (isLiked) {
       handleUnlike(postId)
@@ -381,7 +379,7 @@ const handleUnlike = async (postId) => {
     }
   }
 
-  // Function to handle adding a comment
+  
   const handleAddComment = async (postId) => {
     if (!commentText.trim()) return
 
@@ -399,7 +397,7 @@ const handleUnlike = async (postId) => {
 
       const newComment = await response.json()
       
-      // Update both allPosts and paginated posts
+      
       const updatePostsInArray = (postsArray) => {
         return postsArray.map(post => {
           if (post.id === postId) {
@@ -454,21 +452,21 @@ const handleUnlike = async (postId) => {
   // Function to toggle comment section
   const toggleComments = (postId) => {
     if (activeCommentPost === postId) {
-      setActiveCommentPost(null) // Close comments
+      setActiveCommentPost(null) 
     } else {
-      setActiveCommentPost(postId) // Open comments
-      fetchComments(postId) // Fetch comments when opening
+      setActiveCommentPost(postId) 
+      fetchComments(postId) 
     }
   }
 
-  // Function to get proper image URL
+
   const getImageUrl = (imageUrl) => {
     if (!imageUrl) return "/placeholder.svg"
     const cleanedUrl = imageUrl.replace(/^[\\/]+/, '')
     return imageUrl && !imageUrl.startsWith("http") ? `${BASE_URL}${cleanedUrl}` : imageUrl
   }
 
-  // Function to get display name
+ 
   const getDisplayName = (user) => {
     if (!user) return "Anonymous User"
     return user.username || 
@@ -478,13 +476,13 @@ const handleUnlike = async (postId) => {
            "User"
   }
 
-  // Show likers tooltip
+
   const handleLikesHover = async (postId) => {
     await fetchLikesDetails(postId)
     setShowLikersTooltip(postId)
   }
 
-  // Hide likers tooltip
+ 
   const handleLikesLeave = () => {
     setShowLikersTooltip(null)
   }
@@ -731,7 +729,7 @@ const handleUnlike = async (postId) => {
                       <span>{post.likes_count || 0} Likes</span>
                     </button>
                     
-                    {/* Tooltip showing who liked the post */}
+                   
                     {showLikersTooltip === post.id && post.likes_count > 0 && (
                       <div className="absolute bottom-full left-0 mb-2 bg-white shadow-lg rounded-lg p-2 w-56 max-h-32 overflow-y-auto z-10">
                         <div className="text-sm font-medium mb-1 border-b pb-1">Liked by:</div>
@@ -762,7 +760,7 @@ const handleUnlike = async (postId) => {
                   </button>
                 </div>
 
-                {/* Comments section - shows when activeCommentPost matches this post id */}
+               
                 {activeCommentPost === post.id && (
                   <div className="border-t px-4 py-3 bg-gray-50">
                     {/* Display comments */}

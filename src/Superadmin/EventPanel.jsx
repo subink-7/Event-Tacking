@@ -8,20 +8,22 @@ import {
   FaMapMarkerAlt 
 } from 'react-icons/fa';
 import axios from 'axios';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const EventsPanel = ({ events, setEvents, loading, error }) => {
   const [editingItem, setEditingItem] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState({});
 
-  // Handle input changes in the form
+ 
   const handleInputChange = (e) => {
     const { name, value, type, checked, files } = e.target;
     
     if (type === 'file' && files.length > 0) {
       setFormData({
         ...formData,
-        [name]: files[0] // Store the actual File object
+        [name]: files[0] 
       });
     } else {
       setFormData({
@@ -31,100 +33,137 @@ const EventsPanel = ({ events, setEvents, loading, error }) => {
     }
   };
 
-  // Handle form submission for creating or editing
- // Inside handleSubmit in your React component
- const handleSubmit = async (e) => {
-  e.preventDefault();
-  try {
-    const url = editingItem 
-      ? `http://localhost:8000/events/${editingItem.id}/` 
-      : 'http://localhost:8000/events/';
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const url = editingItem 
+        ? `http://localhost:8000/events/${editingItem.id}/` 
+        : 'http://localhost:8000/events/';
+      
+      const method = editingItem ? 'put' : 'post';
+      
+     
+      const data = new FormData();
+      
     
-    const method = editingItem ? 'put' : 'post';
-    
-    // Use FormData for handling file uploads
-    const data = new FormData();
-    
-    // Add all form fields to FormData
-    Object.keys(formData).forEach(key => {
-      // Special handling for image field when editing
-      if (key === 'image') {
-        if (formData[key] instanceof File) {
-          // If it's a new file upload, add it to the FormData
+      Object.keys(formData).forEach(key => {
+        
+        if (key === 'image') {
+          if (formData[key] instanceof File) {
+           
+            data.append(key, formData[key]);
+          } else if (editingItem && typeof formData[key] === 'string' && formData[key] !== editingItem.image) {
+         
+          }
+        } else {
           data.append(key, formData[key]);
-        } else if (editingItem && typeof formData[key] === 'string' && formData[key] !== editingItem.image) {
-          // Only append the image if it's different from the original
         }
-      } else {
-        data.append(key, formData[key]);
-      }
-    });
+      });
 
-    const config = {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    };
+      const config = {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      };
 
-    const response = await axios[method](url, data, config);
+      const response = await axios[method](url, data, config);
+      
     
-    // Update the events in state with the updated data
-    setEvents(editingItem 
-      ? events.map(event => event.id === editingItem.id ? response.data : event)
-      : [...events, response.data]);
+      setEvents(editingItem 
+        ? events.map(event => event.id === editingItem.id ? response.data : event)
+        : [...events, response.data]);
 
-    // Reset form state
-    setEditingItem(null);
-    setIsCreating(false);
-    setFormData({});
-    
-    // Show success message
-    alert(editingItem ? "Event updated successfully!" : "Event created successfully!");
-    
-    // Reload the page if needed (for admin to see updated content)
-    if (editingItem) {
-      window.location.reload();
+      // Reset form state
+      setEditingItem(null);
+      setIsCreating(false);
+      setFormData({});
+      
+     
+      toast.success(editingItem ? "Event updated successfully!" : "Event created successfully!");
+      
+    } catch (err) {
+      console.error("Error submitting form:", err);
+      toast.error(`Error: ${err.response?.data?.detail || "Failed to process your request"}`);
     }
+  };
+
+  
+  const handleDelete = (id) => {
+    const eventToDelete = events.find(event => event.id === id);
+    if (!eventToDelete) return;
     
-  } catch (err) {
-    console.error("Error submitting form:", err);
-    alert(`Error: ${err.response?.data?.detail || "Failed to process your request"}`);
-  }
-};
-  // Handle delete
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this event?')) return;
     
+    const toastId = `confirm-delete-${id}`;
+    
+    toast.info(
+      <div>
+        <p className="mb-2">Are you sure you want to delete event: <strong>{eventToDelete.title}</strong>?</p>
+        <div className="flex justify-end space-x-2">
+          <button
+            className="px-3 py-1 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+            onClick={() => toast.dismiss(toastId)}
+          >
+            Cancel
+          </button>
+          <button
+            className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+            onClick={() => confirmDelete(id, toastId)}
+          >
+            Delete
+          </button>
+        </div>
+      </div>,
+      {
+        toastId,
+        autoClose: false,
+        closeOnClick: false,
+        closeButton: false
+      }
+    );
+  };
+
+
+  const confirmDelete = async (id, toastId) => {
     try {
       await axios.delete(`http://localhost:8000/events/${id}/`);
       setEvents(events.filter(event => event.id !== id));
+      
+     
+      toast.dismiss(toastId);
+      
+    
+      toast.success('Event deleted successfully!');
     } catch (err) {
+      console.error("Error deleting event:", err);
+      toast.dismiss(toastId);
+      
       if (err.response && err.response.status === 404) {
-        // Show a user-friendly message
-        alert("Event not found. It may have been already deleted.");
-        // Update your local state to remove this event
+       
+        toast.warning("Event not found. It may have been already deleted.");
+        
         setEvents(events.filter(event => event.id !== id));
       } else {
-        console.error("Error deleting event:", err);
+        toast.error(`Failed to delete event: ${err.message}`);
       }
     }
   };
 
-  // Handler for edit button click
+  
   const handleEdit = (item) => {
     setEditingItem(item);
     setFormData(item);
     setIsCreating(false);
   };
 
-  // Handler for add button click
+  
   const handleAdd = () => {
     setEditingItem(null);
     setFormData({});
     setIsCreating(true);
   };
 
-  // Handler for cancel button click
+  
   const handleCancel = () => {
     setEditingItem(null);
     setIsCreating(false);
@@ -329,70 +368,84 @@ const EventsPanel = ({ events, setEvents, loading, error }) => {
   );
 
   // Main render
-  if (loading) {
-    return <div className="flex justify-center p-8">Loading events...</div>;
-  }
-
-  if (error) {
-    return <div className="p-6 text-red-600">Error: {error}</div>;
-  }
-
-  // Show form when adding or editing
-  if (isCreating || editingItem) {
-    return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold">
-            {editingItem ? 'Edit Event' : 'Add New Event'}
-          </h2>
-          <button 
-            onClick={handleCancel}
-            className="p-2 text-gray-500 hover:bg-gray-100 rounded"
-          >
-            <FaTimes className="h-5 w-5" />
-          </button>
+  return (
+    <div>
+      {/* Toast Container */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        limit={3}
+      />
+      
+      {error && (
+        <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-6">
+          {error}
         </div>
-        
-        <form onSubmit={handleSubmit}>
-          {renderFormFields()}
-          
-          <div className="flex justify-end space-x-2 mt-6">
+      )}
+
+      {loading ? (
+        <div className="h-48 flex justify-center items-center text-gray-500 text-lg">
+          Loading...
+        </div>
+      ) : isCreating || editingItem ? (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold">
+              {editingItem ? 'Edit Event' : 'Add New Event'}
+            </h2>
             <button 
-              type="button"
               onClick={handleCancel}
-              className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+              className="p-2 text-gray-500 hover:bg-gray-100 rounded"
             >
-              Cancel
-            </button>
-            <button 
-              type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              {editingItem ? 'Update' : 'Create'} Event
+              <FaTimes className="h-5 w-5" />
             </button>
           </div>
-        </form>
-      </div>
-    );
-  }
-
-  // Default view - table with events
-  return (
-    <div className="bg-white rounded-lg shadow">
-      <div className="flex justify-between items-center p-4 border-b">
-        <h2 className="text-lg font-medium">All Events</h2>
-        <button 
-          onClick={handleAdd}
-          className="flex items-center space-x-1 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          <FaPlus className="h-4 w-4" />
-          <span>Add Event</span>
-        </button>
-      </div>
-      
-      {events.length > 0 ? renderTable() : (
-        <div className="p-8 text-center text-gray-500">
-          No events found. Click "Add Event" to create one.
+          
+          <form onSubmit={handleSubmit}>
+            {renderFormFields()}
+            
+            <div className="flex justify-end space-x-2 mt-6">
+              <button 
+                type="button"
+                onClick={handleCancel}
+                className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit"
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                {editingItem ? 'Update' : 'Create'} Event
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow">
+          <div className="flex justify-between items-center p-4 border-b">
+            <h2 className="text-lg font-medium">All Events</h2>
+            <button 
+              onClick={handleAdd}
+              className="flex items-center space-x-1 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              <FaPlus className="h-4 w-4" />
+              <span>Add Event</span>
+            </button>
+          </div>
+          
+          {events.length > 0 ? renderTable() : (
+            <div className="p-8 text-center text-gray-500">
+              No events found. Click "Add Event" to create one.
+            </div>
+          )}
         </div>
       )}
     </div>

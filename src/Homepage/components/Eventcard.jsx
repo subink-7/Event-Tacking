@@ -2,13 +2,13 @@ import React from "react";
 import { Calendar, MapPin, Clock, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
-const BASE_URL = "http://127.0.0.1:8000/"; // Change this to your backend URL
+const BASE_URL = "http://127.0.0.1:8000/"; 
 
 function Eventcard({ id, title, date, time, starting_point, route, description, image }) {
-  // Correct the image URL construction
+  
   const imageUrl = image && !image.startsWith("http") ? `${BASE_URL}${image}` : image || "/placeholder.svg"; 
   
-  // Format route array to display properly if it's an array
+  
   const displayRoute = Array.isArray(route) ? route.join(" → ") : route;
 
   return (

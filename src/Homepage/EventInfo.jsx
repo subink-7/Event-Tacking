@@ -17,7 +17,7 @@ export default function EventInfo() {
   const eventData = location.state?.eventData
   const navigate = useNavigate()
 
-  // State for map markers
+  
   const [mapMarkers, setMapMarkers] = useState([])
   const [mapCenter, setMapCenter] = useState([27.7172, 85.3240]) // Default to Kathmandu
   const [routeArray, setRouteArray] = useState([])
@@ -25,7 +25,7 @@ export default function EventInfo() {
 
   const goto = () => navigate("/calendar")
 
-  // Extract route data using regex when JSON parsing fails
+  
   const extractRouteWithRegex = (routeString) => {
     try {
       const result = [];
@@ -62,36 +62,36 @@ export default function EventInfo() {
   const processEventData = (eventData) => {
     if (!eventData) {
       console.log("No event data provided.");
-      // Reset states if needed when data is cleared
+    
       setMapMarkers([]);
       setPolylinePoints([]);
       setRouteArray([]);
-      // setMapCenter(DEFAULT_CENTER); // Optional: reset center
+     
       return;
     }
   
     console.log("Processing event data:", eventData);
   
-    // Initialize defaults or clear previous state
+   
     let markers = [];
     let polylinePoints = [];
     let routeNames = [];
-    let centerSet = false; // Flag to track if map center was set from route
+    let centerSet = false;
   
-    // --- Process Route Data ---
+ 
     if (eventData.route) {
       try {
         let routeData;
-        let routeString = eventData.route; // Get the raw route value
+        let routeString = eventData.route; 
   
-        // --- Route Parsing ---
+       
         if (typeof routeString === 'string') {
            console.log("Route is a string, attempting to parse:", routeString);
-          // Clean up potential outer quotes (defensive programming)
+        
           if (routeString.startsWith('"') && routeString.endsWith('"')) {
             routeString = routeString.slice(1, -1);
           }
-          // Unescape inner quotes if necessary (e.g., if JSON was double-encoded)
+       
           routeString = routeString.replace(/\\"/g, '"');
   
           try {
@@ -99,23 +99,22 @@ export default function EventInfo() {
             console.log("Successfully parsed route string:", routeData);
           } catch (parseError) {
             console.error("Error parsing route string as JSON:", parseError, "Route string was:", routeString);
-            // Optional: Add fallback regex parsing here if JSON often fails
-            routeData = null; // Parsing failed
+            
+            routeData = null; 
           }
         } else if (typeof routeString === 'object') {
            console.log("Route is already an object:", routeString);
-          // It might already be an object (less likely based on your example, but good to handle)
+         
           routeData = routeString;
         } else {
            console.warn("Route data is not a string or object:", routeString);
            routeData = null;
         }
-        // --- End Route Parsing ---
+        
   
   
-        // --- Use Parsed Data ---
         if (Array.isArray(routeData) && routeData.length > 0) {
-           // Filter out any invalid points (missing lat/lng) just in case
+           
            const validPoints = routeData.filter(p => p && typeof p.lat === 'number' && typeof p.lng === 'number');
   
            if (validPoints.length > 0) {
@@ -123,25 +122,25 @@ export default function EventInfo() {
                const firstPoint = validPoints[0];
                setMapCenter([parseFloat(firstPoint.lat), parseFloat(firstPoint.lng)]);
                console.log("Setting map center to first route point:", [firstPoint.lat, firstPoint.lng]);
-               centerSet = true; // Mark that center was set
+               centerSet = true; 
   
                // 2. Create Markers
                markers = validPoints.map((point, index) => ({
                    position: [parseFloat(point.lat), parseFloat(point.lng)],
-                   title: point.name || `Point ${index + 1}`, // Use name or fallback
+                   title: point.name || `Point ${index + 1}`, 
                    description: index === 0 ? "Starting Point" :
                                 index === validPoints.length - 1 ? "Final Destination" :
                                 "Checkpoint",
                    index: index + 1,
-                   // isRoutePoint: !!point.isRoutePoint // Keep if you use this property
+                   
                }));
                console.log("Created markers:", markers);
   
-               // 3. Extract Polyline points
+             
                polylinePoints = markers.map(marker => marker.position);
                console.log("Created polyline points:", polylinePoints);
   
-               // 4. Extract Route Names
+              
                routeNames = validPoints.map(point => point.name || `Point ${point.index || 'N/A'}`); // Use name or fallback
                console.log("Extracted route names:", routeNames);
   
@@ -152,13 +151,13 @@ export default function EventInfo() {
           console.warn("No valid route data found after parsing or route array is empty.");
         }
       } catch (error) {
-        // Catch errors during the route processing block
+        
         console.error("Error processing route data:", error);
       }
     } else {
       console.log("No route data found in eventData.");
     }
-    // --- End Process Route Data ---
+  
   
   
     // --- Update State ---

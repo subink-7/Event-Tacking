@@ -376,12 +376,12 @@ export default function AdminDashboard() {
       return
     }
     
-    // Validate route points
-    if (routePoints.length < 2) {
-      toast.error("Please add at least two route points (starting and ending points)");
-      setError("Please add at least two route points (starting and ending points).")
-      return
-    }
+    // // Validate route points
+    // if (routePoints.length < 2) {
+    //   toast.error("Please add at least two route points (starting and ending points)");
+    //   setError("Please add at least two route points (starting and ending points).")
+    //   return
+    // }
     
     // Check if all route points have names
     if (routePoints.some(point => !point.name.trim())) {
@@ -393,7 +393,7 @@ export default function AdminDashboard() {
     setError("")
     setIsSubmitting(true)
     
-    // Create a loading toast that will be updated
+   
     const toastId = toast.loading("Creating event, please wait...");
 
     const formData = new FormData()
@@ -422,7 +422,7 @@ export default function AdminDashboard() {
         console.log("Event created successfully:", data)
         const eventId = data.id // Make sure we're getting the correct event ID
 
-        // After event is created, update toast to show notification is being sent
+      
         if (eventData.send_notifications) {
           toast.update(toastId, { 
             render: "Event created! Sending notifications to all users...", 
@@ -480,7 +480,7 @@ export default function AdminDashboard() {
           });
         }
 
-        // Clear form
+   
         setEventData({
           title: "",
           date: "",
@@ -629,7 +629,7 @@ export default function AdminDashboard() {
             {/* Divider */}
             <hr className="my-4" />
 
-            {/* Starting Point with Location Verification */}
+           
             <div>
               <label htmlFor="starting_point" className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-1">
                 <MapPin className="h-4 w-4" />
@@ -676,7 +676,7 @@ export default function AdminDashboard() {
               )}
             </div>
 
-            {/* Coordinates (optional manual input) */}
+         
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="latitude" className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-1">
@@ -746,7 +746,7 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* Route Points */}
+        
             <div>
               <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2">
                 <FileText className="h-4 w-4" />

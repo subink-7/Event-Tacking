@@ -117,7 +117,7 @@ function AnimatedRoute({ positions }) {
       }
     }
 
-    // Start with just the first point
+    
     setDisplayedPoints([positions[0]])
     animationRef.current = requestAnimationFrame(animate)
 
@@ -132,11 +132,11 @@ function AnimatedRoute({ positions }) {
 
   return (
     <>
-      {/* Glow effect */}
+    
       <Polyline positions={displayedPoints} color="#ffffff" weight={10} opacity={0.4} smoothFactor={1} />
-      {/* Main route line */}
+   
       <Polyline positions={displayedPoints} color="#3b82f6" weight={5} opacity={0.9} smoothFactor={1} />
-      {/* Animated dot at the end of the line */}
+    
       {displayedPoints.length > 0 && (
         <Marker
           position={displayedPoints[displayedPoints.length - 1]}
@@ -254,15 +254,15 @@ function TimeOfDayEffect({ time = "day" }) {
 
 /**
  * Enhanced Map Component with beautiful styling and effects
- * @param {Object} props - Component props
- * @param {Array} props.center - Center coordinates [lat, lng]
- * @param {Array} props.markers - Array of marker objects
- * @param {Array} props.polylinePoints - Array of route points
- * @param {string} props.height - Map height
- * @param {string} props.mapStyle - Map style (standard, satellite, terrain, dark, watercolor)
- * @param {string} props.timeOfDay - Time of day effect (day, sunset, night)
- * @param {string} props.weather - Weather effect (sunny, rainy, snowy)
- * @param {boolean} props.animate - Whether to animate the route
+ * @param {Object} props 
+ * @param {Array} props.center 
+ * @param {Array} props.markers 
+ * @param {Array} props.polylinePoints 
+ * @param {string} props.height 
+ * @param {string} props.mapStyle 
+ * @param {string} props.timeOfDay 
+ * @param {string} props.weather 
+ * @param {boolean} props.animate 
  */
 export function MapComponent({ 
   center, 
@@ -289,13 +289,13 @@ export function MapComponent({
     )
   }
 
-  // Filter out intermediate route points that shouldn't have markers
+ 
   const visibleMarkers = markers ? markers.filter((marker) => !marker.isRoutePoint) : []
 
-  // Get all points for the polyline (including intermediate points)
+
   const routePoints = markers ? markers.map((marker) => marker.position) : polylinePoints
 
-  // Calculate route info
+ 
   const routeInfo = calculateRouteInfo(routePoints || [])
 
   // Map style URLs

@@ -104,13 +104,13 @@ const CalendarPage = () => {
   const handleNextMonth = () => setCurrentDate(addMonths(currentDate, 1))
   const handleBackToTracking = () => navigate("/tracking")
 
-  // Get the first day of the month
+  
   const monthStart = startOfMonth(currentDate)
-  // Get the last day of the month
+
   const monthEnd = endOfMonth(currentDate)
-  // Get the first day of the first week of the month
+  
   const startDate = startOfWeek(monthStart)
-  // Generate calendar days including days from previous and next months to fill weeks
+ 
   const dateRange = eachDayOfInterval({ 
     start: startDate, 
     end: addDays(endOfMonth(currentDate), 6 - getDay(monthEnd)) 
@@ -124,7 +124,7 @@ const CalendarPage = () => {
 
   const eventsThisMonth = normalizeEvents().filter((event) => isSameMonth(event.date, currentDate))
 
-  // Get user email from localStorage - using the correct key "email"
+ 
   const getUserEmail = () => {
     const storedEmail = localStorage.getItem("email")
 
@@ -142,11 +142,11 @@ const CalendarPage = () => {
   const sendNotificationToBackend = (event, isAdding) => {
     const action = isAdding ? "add" : "remove"
 
-    // Get user email from localStorage
+    
     const recipientEmail = getUserEmail()
 
     if (!recipientEmail) {
-      return // Toast already shown in getUserEmail
+      return 
     }
 
     fetch("http://localhost:8000/events/send_notifications/", {
@@ -265,7 +265,7 @@ const CalendarPage = () => {
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-        {/* Back button and page title */}
+       
         <div className="py-6 flex items-center justify-between">
           <button
             onClick={handleBackToTracking}

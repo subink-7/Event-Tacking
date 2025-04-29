@@ -9,12 +9,14 @@ import {
   FaCalendarAlt 
 } from 'react-icons/fa';
 import axios from 'axios';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const PostsPanel = ({ posts: initialPosts, setPosts, users, events, loading: initialLoading, error: initialError }) => {
   const [editingItem, setEditingItem] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState({});
-  const [viewMode, setViewMode] = useState('all'); // 'all', 'approved', 'pending'
+  const [viewMode, setViewMode] = useState('all'); 
   const [loading, setLoading] = useState(initialLoading);
   const [error, setError] = useState(initialError);
   const [localPosts, setLocalPosts] = useState(initialPosts || []);
@@ -27,7 +29,7 @@ const PostsPanel = ({ posts: initialPosts, setPosts, users, events, loading: ini
     return token ? { Authorization: `Bearer ${token}` } : null;
   };
 
-  // Refresh token function
+  
   const refreshToken = async () => {
     try {
       const refreshToken = localStorage.getItem("refreshToken");
@@ -51,10 +53,11 @@ const PostsPanel = ({ posts: initialPosts, setPosts, users, events, loading: ini
     }
   };
   
-  // Fetch data with authentication
+ 
   const fetchWithAuth = async (url, options = {}) => {
     const authHeader = getAuthHeader();
     if (!authHeader) {
+      toast.error("Not authenticated - Please login again");
       throw new Error("Not authenticated - Please login again");
     }
 
@@ -85,13 +88,14 @@ const PostsPanel = ({ posts: initialPosts, setPosts, users, events, loading: ini
           };
           return axios(url, newConfig);
         }
+        toast.error("Session expired. Please login again.");
         throw new Error("Session expired. Please login again.");
       }
       throw error;
     }
   };
 
-  // Load data on component mount
+
   useEffect(() => {
     const loadData = async () => {
       if (initialPosts) return;
@@ -101,9 +105,11 @@ const PostsPanel = ({ posts: initialPosts, setPosts, users, events, loading: ini
         const postsResponse = await fetchWithAuth(`${BASE_URL}posts/feedback/`);
         setLocalPosts(postsResponse.data);
         if (setPosts) setPosts(postsResponse.data);
+        toast.success("Posts loaded successfully");
       } catch (err) {
         console.error("Error loading posts:", err);
         setError(err.message);
+        toast.error(`Error loading posts: ${err.message}`);
       } finally {
         setLoading(false);
       }
@@ -112,7 +118,7 @@ const PostsPanel = ({ posts: initialPosts, setPosts, users, events, loading: ini
     loadData();
   }, []);
 
-  // Handle input changes in the form
+ 
   const handleInputChange = (e) => {
     const { name, value, type, checked, files } = e.target;
     
@@ -129,59 +135,53 @@ const PostsPanel = ({ posts: initialPosts, setPosts, users, events, loading: ini
     }
   };
 
-  // Handle form submission for creating or editing
-// In the handleSubmit function, make sure the user ID is correctly formatted
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  try {
-    // For edit (PUT) request, use the post/<post_id>/ endpoint
-    // For create (POST) request, use the /<event_id>/ endpoint
-    const url = editingItem 
-      ? `${BASE_URL}posts/feedback/post/${editingItem.id}/` 
-      : (formData.event 
-         ? `${BASE_URL}posts/feedback/${formData.event}/` 
-         : `${BASE_URL}posts/feedback/`);
-    
-    const method = editingItem ? 'put' : 'post';
-    
-    // Use FormData for handling file uploads
-    const data = new FormData();
-    
-    // Make sure the user ID is properly sent
-    // Using explicit Number conversion to ensure it's sent as a number if needed
-    // Some APIs need the ID as a number, not a string
-    if (formData.user) {
-      data.append('user', formData.user);
-      // You might also need to add a special parameter to indicate admin override
-      data.append('admin_override', 'true');
-    }
-    
-    data.append('content', formData.content || '');
-    
-    // Add optional fields
-    if (formData.event) {
-      data.append('event', formData.event);
-    }
-    
-    if (formData.image instanceof File) {
-      data.append('image', formData.image);
-    }
-    
-    if (formData.is_approved !== undefined) {
-      data.append('is_approved', formData.is_approved);
-    }
-
-    const response = await fetchWithAuth(url, {
-      method: method,
-      data: data,
-      headers: {
-        'Content-Type': 'multipart/form-data'
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+     
+      const url = editingItem 
+        ? `${BASE_URL}posts/feedback/post/${editingItem.id}/` 
+        : (formData.event 
+           ? `${BASE_URL}posts/feedback/${formData.event}/` 
+           : `${BASE_URL}posts/feedback/`);
+      
+      const method = editingItem ? 'put' : 'post';
+      
+      
+      const data = new FormData();
+      
+      
+      if (formData.user) {
+        data.append('user', formData.user);
+        
+        data.append('admin_override', 'true');
       }
-    });
-    
-    // Rest of your code...
-      // Process response based on structure:
-      // { id, user, user_detail, event, content, image_url, created_at, updated_at, likes_count, comments, is_liked_by_user }
+      
+      data.append('content', formData.content || '');
+      
+      
+      if (formData.event) {
+        data.append('event', formData.event);
+      }
+      
+      if (formData.image instanceof File) {
+        data.append('image', formData.image);
+      }
+      
+      if (formData.is_approved !== undefined) {
+        data.append('is_approved', formData.is_approved);
+      }
+
+      const response = await fetchWithAuth(url, {
+        method: method,
+        data: data,
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      
       const updatedPost = {
         ...response.data,
         user_id: response.data.user,
@@ -199,20 +199,55 @@ const handleSubmit = async (e) => {
       setLocalPosts(updatedPosts);
       if (setPosts) setPosts(updatedPosts);
   
-      // Reset form
+     
+      toast.success(editingItem ? "Post updated successfully" : "Post created successfully");
+      
+     
       setEditingItem(null);
       setIsCreating(false);
       setFormData({});
     } catch (err) {
       console.error("Error submitting form:", err);
       setError(err.message);
+      toast.error(`Error: ${err.message}`);
     }
   };
 
-  // Handle delete
+ 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this post?')) return;
-    
+   
+    const toastId = toast.info(
+      <div>
+        <p>Are you sure you want to delete this post?</p>
+        <div className="flex justify-end mt-2 space-x-2">
+          <button 
+            onClick={() => {
+              toast.dismiss(toastId);
+              performDelete(id);
+            }}
+            className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            Delete
+          </button>
+          <button 
+            onClick={() => toast.dismiss(toastId)}
+            className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>,
+      {
+        autoClose: false,
+        closeOnClick: false,
+        closeButton: false,
+        draggable: false
+      }
+    );
+  };
+
+  
+  const performDelete = async (id) => {
     try {
       await fetchWithAuth(`${BASE_URL}posts/feedback/post/${id}/`, {
         method: 'delete'
@@ -221,36 +256,40 @@ const handleSubmit = async (e) => {
       const updatedPosts = localPosts.filter(post => post.id !== id);
       setLocalPosts(updatedPosts);
       if (setPosts) setPosts(updatedPosts);
+      
+      toast.success("Post deleted successfully");
     } catch (err) {
       console.error("Error deleting post:", err);
       setError(err.message);
+      toast.error(`Error deleting post: ${err.message}`);
     }
   };
 
-  // Handler for approval status change
 
-  // Handler for edit button click
   const handleEdit = (item) => {
     setEditingItem(item);
     setFormData(item);
     setIsCreating(false);
+    toast.info("Editing post");
   };
 
-  // Handler for add button click
+ 
   const handleAdd = () => {
     setEditingItem(null);
     setFormData({});
     setIsCreating(true);
+    toast.info("Adding new post");
   };
 
-  // Handler for cancel button click
+ 
   const handleCancel = () => {
     setEditingItem(null);
     setIsCreating(false);
     setFormData({});
+    toast.info("Cancelled");
   };
 
-  // Filter posts based on view mode
+  
   const filteredPosts = () => {
     switch(viewMode) {
       case 'approved':
@@ -262,7 +301,21 @@ const handleSubmit = async (e) => {
     }
   };
 
-  // Form fields for post
+  
+  useEffect(() => {
+    if (error && error.includes("Authentication")) {
+      toast.error("Authentication error: Please login again");
+      
+      // window.location.href = '/login';
+    }
+  }, [error]);
+
+
+  const getEventName = (eventId) => {
+    const event = events.find(e => e.id === Number(eventId));
+    return event ? event.title : `Event ${eventId}`;
+  };
+
   const renderFormFields = () => (
     <>
       <div className="mb-4">
@@ -292,13 +345,18 @@ const handleSubmit = async (e) => {
           value={formData.event?.id || formData.event_id || ''} 
           onChange={handleInputChange}
         >
-          <option value="">None (General Feedback)</option>
+          <option value="">General Feedback </option>
           {events.map(event => (
             <option key={event.id} value={event.id}>
               {event.title} ({event.date})
             </option>
           ))}
         </select>
+        {formData.event && (
+          <p className="mt-1 text-sm text-blue-600">
+            Selected event: {typeof formData.event === 'object' ? formData.event.title : getEventName(formData.event)}
+          </p>
+        )}
       </div>
       <div className="mb-4">
         <label className="block mb-2 font-medium" htmlFor="content">Content <span className="text-red-500">*</span></label>
@@ -312,9 +370,7 @@ const handleSubmit = async (e) => {
           required
         />
       </div>
- 
-        
-      
+    
       <div className="mb-4">
         <label className="block mb-2 font-medium" htmlFor="image">Image</label>
         <input 
@@ -343,7 +399,6 @@ const handleSubmit = async (e) => {
             <th className="p-3 text-left font-medium text-gray-600 border border-gray-200">Title</th>
             <th className="p-3 text-left font-medium text-gray-600 border border-gray-200">User</th>
             <th className="p-3 text-left font-medium text-gray-600 border border-gray-200">Event</th>
-          
             <th className="p-3 text-left font-medium text-gray-600 border border-gray-200">Created</th>
             <th className="p-3 text-left font-medium text-gray-600 border border-gray-200">Actions</th>
           </tr>
@@ -370,7 +425,7 @@ const handleSubmit = async (e) => {
                     (user ? `${user.first_name || ''} ${user.last_name || ''}` : 'Unknown User')}
                 </td>
                 <td className="p-3 border border-gray-200">
-                  {event ? (typeof event === 'object' ? event.title : 'Event ' + event) : 'General Feedback'}
+                  {event ? (typeof event === 'object' ? event.title : getEventName(event)) : 'General Feedback'}
                 </td>
                 
                 <td className="p-3 border border-gray-200">
@@ -402,16 +457,6 @@ const handleSubmit = async (e) => {
     </div>
   );
 
-  // Handle authentication errors
-  useEffect(() => {
-    if (error && error.includes("Authentication")) {
-      // Redirect to login page or show login modal
-      alert("Authentication error: Please login again");
-      // You could also redirect to login page:
-      // window.location.href = '/login';
-    }
-  }, [error]);
-
   // Main render
   if (loading) {
     return <div className="flex justify-center p-8">Loading posts...</div>;
@@ -425,6 +470,7 @@ const handleSubmit = async (e) => {
   if (isCreating || editingItem) {
     return (
       <div className="bg-white rounded-lg shadow p-6">
+        <ToastContainer position="top-right" autoClose={3000} />
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-semibold">
             {editingItem ? 'Edit Post' : 'Add Post'}
@@ -476,10 +522,20 @@ const handleSubmit = async (e) => {
   // Default view - table with posts
   return (
     <div className="bg-white rounded-lg shadow">
+      <ToastContainer 
+        position="top-right" 
+        autoClose={3000} 
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
       <div className="flex justify-between items-center p-4 border-b">
         <div>
           <h2 className="text-lg font-medium">All Posts</h2>
-         
         </div>
         <button 
           onClick={handleAdd}

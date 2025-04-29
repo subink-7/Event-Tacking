@@ -15,12 +15,10 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false)
   const navigate = useNavigate();
 
-  // Add effect to check if user is already logged in
   useEffect(() => {
     const accessToken = localStorage.getItem("accessToken");
     if (accessToken) {
-      // If already authenticated, redirect to dashboard
-      // Using replace: true to prevent back navigation to login
+   
       navigate("/dashboard", { replace: true });
     }
   }, [navigate]);
@@ -46,9 +44,9 @@ export default function Signup() {
 
       if (response.ok) {
         const data = await response.json()
-        console.log("API Response:", data) // Log the response to see its structure
+        console.log("API Response:", data)      
 
-        // Now using the correct keys for access_token and refresh_token
+   
         if (data.access && data.refresh) {
           localStorage.setItem("accessToken", data.access)
           localStorage.setItem("refreshToken", data.refresh)
@@ -59,14 +57,13 @@ export default function Signup() {
          
           console.log("Storing token for user ID:", data.id);
 
-          // Check user role and redirect accordingly
-          // Use replace: true to replace current history entry instead of adding a new one
+         
           if (data.role === "ADMIN") {
-            // Use replace to prevent the login page from being in history
+          
             navigate("/dashboard", { replace: true })
             console.log("UserRole", data.role)
           } else if (data.role === "SUPERADMIN") {
-            // Use replace to prevent the login page from being in history
+       
             navigate("/superadmin", { replace: true })
             console.log("UserRole", data.role)
           } else {

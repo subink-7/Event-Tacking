@@ -27,48 +27,47 @@ const SuperadminDashboard = () => {
     !!localStorage.getItem("accessToken")
   );
   
-  // Base URL for API endpoints
+  
   const BASE_URL = "http://localhost:8000/";
   
-  // IMPORTANT: Verify user is authenticated and is a SUPERADMIN
+  
   useEffect(() => {
     const accessToken = localStorage.getItem("accessToken");
     const userRole = localStorage.getItem("role");
     
     if (!accessToken) {
-      // Not logged in at all
+      
       navigate("/login", { replace: true });
       return;
     } 
     
     if (userRole !== "SUPERADMIN") {
-      // Logged in but not a superadmin - redirect to normal dashboard
+     
       navigate("/login", { replace: true });
       return;
     }
     
-    // If we reach here, user is authenticated and is a superadmin
+    
     setUserRole(userRole);
     setIsLoggedIn(true);
     
-    // Load user name if available
+   
     const storedName = localStorage.getItem("name");
     if (storedName) {
       setUserName(storedName);
     }
   }, [navigate]);
   
-  // NEW: Enhanced history management to prevent back button from leaving superadmin page
+  
   useLayoutEffect(() => {
     document.title = "Superadmin Dashboard";
     
-    // This function will run on any history change (back/forward)
+    
     const handleHistoryChange = () => {
       const userRole = localStorage.getItem("role");
       const isAuthenticated = !!localStorage.getItem("accessToken");
       
-      // If current location is not /superadmin and user is a superadmin,
-      // force redirect back to superadmin dashboard
+     
       if (location.pathname !== "/superadmin" && 
           isAuthenticated && 
           userRole === "SUPERADMIN") {
@@ -82,10 +81,10 @@ const SuperadminDashboard = () => {
       }
     };
     
-    // Listen for popstate events (browser back/forward)
+ 
     window.addEventListener('popstate', handleHistoryChange);
     
-    // Run once on component mount to ensure we're on the right page
+    
     handleHistoryChange();
     
     return () => {
@@ -93,7 +92,7 @@ const SuperadminDashboard = () => {
     };
   }, [navigate, location]);
   
-  // Auth helper functions
+  
   const getAuthHeader = () => {
     const token = localStorage.getItem("accessToken");
     return token ? { Authorization: `Bearer ${token}` } : null;
@@ -146,15 +145,15 @@ const SuperadminDashboard = () => {
       });
       
       if (response.status === 401) {
-        // Try to refresh token
+      
         const refreshed = await refreshToken();
         if (refreshed) {
-          // Verify role again after token refresh
+         
           const roleAfterRefresh = localStorage.getItem("role");
           if (roleAfterRefresh !== "SUPERADMIN") {
             throw new Error("Unauthorized - Superadmin access required");
           }
-          return fetchWithAuth(url, options); // Retry with new token
+          return fetchWithAuth(url, options);
         }
         throw new Error("Session expired. Please login again.");
       }
@@ -170,11 +169,11 @@ const SuperadminDashboard = () => {
     }
   };
 
-  // Function to fetch data for the active tab
+  
   const fetchActiveTabData = async () => {
     setLoading(true);
     try {
-      // Always verify role before fetching data
+    
       const currentRole = localStorage.getItem("role");
       if (currentRole !== "SUPERADMIN") {
         navigate("/", { replace: true });
@@ -224,34 +223,34 @@ const SuperadminDashboard = () => {
     }
   };
 
-  // Fetch data based on active tab
+  
   useEffect(() => {
     if (isLoggedIn && userRole === "SUPERADMIN") {
       fetchActiveTabData();
     }
   }, [activeTab, isLoggedIn, userRole]);
   
-  // Function to fetch summary data for all tabs
+  
   const fetchSummaryData = async () => {
     try {
-      // Verify role before fetching
+     
       const currentRole = localStorage.getItem("role");
       if (currentRole !== "SUPERADMIN") {
         navigate("/", { replace: true });
         return;
       }
       
-      // Fetch users summary
+     
       const usersResponse = await fetchWithAuth(`${BASE_URL}users/api/customuser/`);
       const usersData = await usersResponse.json();
       setUsers(usersData);
       
-      // Fetch events summary
+      
       const eventsResponse = await fetchWithAuth(`${BASE_URL}events/`);
       const eventsData = await eventsResponse.json();
       setEvents(eventsData);
       
-      // Fetch posts summary
+   
       const postsResponse = await fetchWithAuth(`${BASE_URL}posts/feedback/`);
       const postsData = await postsResponse.json();
       setPosts(postsData);
@@ -265,17 +264,17 @@ const SuperadminDashboard = () => {
     }
   };
   
-  // Add a separate effect to fetch summary data on component mount
+ 
   useEffect(() => {
     if (isLoggedIn && userRole === "SUPERADMIN") {
       fetchSummaryData();
     }
-  }, [isLoggedIn, userRole]); // Dependency on role and login status
+  }, [isLoggedIn, userRole]); 
 
-  // Enhanced logout function
+ 
   const handleLogout = () => {
     console.log("Logging out...");
-    // Clear ALL auth data
+ 
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("name");
@@ -287,13 +286,13 @@ const SuperadminDashboard = () => {
     setUserRole("");
     setIsLoggedIn(false);
     
-    // Force navigate to login with replace to prevent back navigation
+
     navigate("/login", { replace: true });
   };
 
-  // Handler for manual refresh
+
   const handleRefresh = () => {
-    // Refresh all data
+   
     setLoading(true);
     fetchSummaryData();
     fetchActiveTabData();
@@ -334,7 +333,7 @@ const SuperadminDashboard = () => {
     );
   };
 
-  // Determine which component to render based on active tab
+ 
   const renderActivePanel = () => {
     switch(activeTab) {
       case 'users':
@@ -378,7 +377,7 @@ const SuperadminDashboard = () => {
     }
   };
 
-  // If user is not logged in or not a superadmin, show nothing (will be redirected)
+
   if (!isLoggedIn || userRole !== "SUPERADMIN") {
     return null;
   }

@@ -18,11 +18,11 @@ function EventsPage({ isHomepage = true }) {
         return response.json();
       })
       .then((data) => {
-        // Filter out past events (optional - remove if you want to show past events too)
+        
         const now = new Date();
         const upcomingEvents = data.filter(event => new Date(event.date) >= now);
         
-        // Sort events by nearest date (earliest first)
+  
         const sortedEvents = upcomingEvents.sort((a, b) => new Date(a.date) - new Date(b.date));
         setEvents(sortedEvents);
         setLoading(false);
@@ -33,7 +33,7 @@ function EventsPage({ isHomepage = true }) {
       });
   }, []);
 
-  // If this is homepage, limit to 3 events, otherwise show all
+
   const displayedEvents = isHomepage ? events.slice(0, 3) : events;
 
   return (
@@ -43,7 +43,7 @@ function EventsPage({ isHomepage = true }) {
         <Header />
       </div>
 
-      {/* Hero Banner - Only show on homepage */}
+     
       {isHomepage && (
         <div className="relative w-full h-[60vh] max-h-[600px] overflow-hidden rounded-full mt-5">
           <img
